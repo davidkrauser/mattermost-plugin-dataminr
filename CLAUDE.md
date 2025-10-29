@@ -285,31 +285,17 @@ The plugin exposes a single REST API endpoint for backend status:
 
 ### 4.3 Backend Interface
 
-All backend types must implement a common interface defined in `server/backend/interface.go`:
+All backend types must implement a common interface. Key responsibilities:
 
-**Key Interface Methods:**
-- `Initialize(config Config)` - Prepares the backend with its configuration
-- `Start(ctx context.Context)` - Begins the polling cycle
-- `Stop()` - Gracefully stops the backend
-- `GetID()` - Returns the backend's unique identifier (UUID)
-- `GetName()` - Returns the backend's display name
-- `GetType()` - Returns the backend type (e.g., "dataminr")
-- `GetStatus()` - Returns the current health status
+- Initialize with configuration
+- Start/stop polling lifecycle
+- Provide unique identifier, name, and type
+- Return current health status
 
-**Configuration Structure:**
-- ID (UUID v4), Name, Type, Enabled, URL
-- APIID, APIKey, ChannelID
-- PollIntervalSeconds
-
-**Status Structure:**
-- Enabled, LastPollTime, LastSuccessTime
-- ConsecutiveFailures, IsAuthenticated, LastError
-
-**Alert Structure:**
-- BackendName, AlertID, AlertType, Headline
-- EventTime, AlertURL, PublicLink, PublicText
-- LocationData (Address, Latitude, Longitude, Confidence)
-- Metadata, RawJSON
+The interface will work with three main structures:
+- **Config**: ID, Name, Type, Enabled, URL, credentials, ChannelID, PollIntervalSeconds
+- **Status**: Enabled, poll times, failure count, authentication state, last error
+- **Alert**: Normalized alert data with backend name, alert metadata, location, and raw JSON
 
 ### 4.4 Backend Registry
 
@@ -453,19 +439,25 @@ server/backend/dataminr/
 
 | Error Type | HTTP Code | Action | Wait Time | Notes |
 |------------|-----------|--------|-----------|-------|
-| Authentication Failed | 401 | Force re-authentication | Immediate | Token expired |
-| Rate Limit | 429 | Back off | 60 seconds | Resume after backoff |
-| Network Error | - | Retry with backoff | 30s, 60s, 120s | Exponential backoff |
-| Timeout | - | Retry | 30 seconds | May indicate API issues |
-| Bad Request | 400 | Log and skip | Next cycle | Configuration issue |
-| Server Error | 500 | Retry | 60 seconds | Backend API issue |
+| Authentication Failed | 401 | Force re-authentication | Next poll cycle | Token expired |
+| Rate Limit | 429 | Log and continue | Next poll cycle | Resume at next interval |
+| Network Error | - | Log and retry | Next poll cycle | Transient network issues |
+| Timeout | - | Log and retry | Next poll cycle | May indicate API issues |
+| Bad Request | 400 | Log and skip | Next poll cycle | Configuration issue |
+| Server Error | 500 | Log and retry | Next poll cycle | Backend API issue |
 
-### 7.3 Admin Notifications
+**Note:** No exponential backoff is implemented. Backends will simply retry at their configured poll interval. After `MaxConsecutiveFailures` (5) consecutive failures, the backend is automatically disabled.
 
-When a backend is disabled due to consecutive failures, post notification to configured admin channel:
-- Backend name and last error
-- Action required: Check config, verify credentials, check API status, reload plugin
-- Backend will not resume until plugin reload
+### 7.3 Error Logging
+
+When a backend experiences errors:
+- Log each error with details (backend ID, backend name, error type, error message)
+- Track consecutive failure count
+- When a backend is disabled due to `MaxConsecutiveFailures`:
+  - Log critical error with backend details and last error message
+  - Update backend status in KV store to reflect disabled state
+  - Backend will not resume until admin re-enables it via configuration or plugin reload
+- Administrators should monitor server logs for backend health
 
 ---
 
@@ -556,4 +548,321 @@ Response: {"alerts": [...], "to": "cursor"}
 
 ---
 
-**End of Specification**
+## Implementation Plan
+
+### Overview
+
+This plan breaks down the implementation into discrete phases. Each phase represents a complete, independently testable component. Within each phase, steps must be completed sequentially, with each step including:
+1. Code implementation
+2. Unit tests (must pass)
+3. Lint checks with `make check-style` (must pass)
+4. Git commit
+
+Integration tests (using `_integration_test.go` files) are added at the end of applicable phases.
+
+### Testing Strategy
+
+- **Unit Tests**: Use `testify` for assertions, `plugintest` for mocking Mattermost Plugin API
+- **HTTP Mocking**: Use `httptest` for mocking external API calls (Dataminr)
+- **Integration Tests**: Tests exercising multiple components together, still using mocks, in `*_integration_test.go` files
+- **UUID Generation**: Use Go's built-in `crypto/rand` with standard UUID v4 format
+
+### Phase Status Tracking
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| 0 | ⬜ Not Started | Project Setup & Cleanup |
+| 1 | ⬜ Not Started | Core Backend Infrastructure |
+| 2 | ⬜ Not Started | Configuration System |
+| 3 | ⬜ Not Started | Dataminr Types & State |
+| 4 | ⬜ Not Started | Dataminr Authentication |
+| 5 | ⬜ Not Started | Dataminr API Client |
+| 6 | ⬜ Not Started | Dataminr Alert Processor |
+| 7 | ⬜ Not Started | Dataminr Poller |
+| 8 | ⬜ Not Started | Dataminr Backend Main |
+| 9 | ⬜ Not Started | Backend Manager & Plugin Integration |
+| 10 | ⬜ Not Started | Backend Status API |
+| 11 | ⬜ Not Started | Alert Formatter |
+| 12 | ⬜ Not Started | Mattermost Poster |
+| 13 | ⬜ Not Started | Webapp Admin Console Component |
+
+---
+
+### Phase 0: Project Setup & Cleanup ⬜
+
+**Goal**: Remove starter template remnants and prepare clean foundation.
+
+**Steps**:
+- Delete starter template code: `server/command/`, `server/store/kvstore/startertemplate.go`, `server/job.go`
+- Clean up `server/plugin.go` and `server/plugin_test.go`
+- Update `plugin.json` with Dataminr plugin metadata and placeholder for `Backends` setting
+- Update `README.md` with Dataminr plugin description
+- Verify build system: `make test`, `make check-style`, `make dist`
+
+**Completion Criteria**:
+- All starter template code removed
+- Build system functional
+- All tests passing
+- Lint checks passing
+
+---
+
+### Phase 1: Core Backend Infrastructure ⬜
+
+**Goal**: Define backend interface, core types, and registry.
+
+**Steps**:
+- Create `server/backend/types.go` with Config, Status, Alert, and Location structs
+- Define constants for failure thresholds and timing
+- Create `server/backend/interface.go` with Backend interface
+- Create `server/backend/registry.go` with thread-safe registry implementation
+- Write comprehensive unit tests for all components
+
+**Completion Criteria**:
+- Backend interface defined
+- Core types implemented
+- Registry functional with full test coverage
+- All tests passing
+- Lint checks passing
+
+---
+
+### Phase 2: Configuration System ⬜
+
+**Goal**: Implement configuration parsing and validation.
+
+**Steps**:
+- Create `server/config/validator.go` with validation functions
+- Add `Backends` field to `server/configuration.go`
+- Implement `OnConfigurationChange()` in `server/plugin.go` with backend lifecycle management
+- Write unit tests for all validation scenarios and lifecycle management
+
+**Completion Criteria**:
+- Configuration validation working
+- OnConfigurationChange handles backend lifecycle
+- All validation scenarios tested
+- All tests passing
+- Lint checks passing
+
+---
+
+### Phase 3: Dataminr Types & State ⬜
+
+**Goal**: Implement Dataminr-specific types and KV state storage.
+
+**Steps**:
+- Create `server/backend/dataminr/types.go` with Dataminr-specific structs for API responses
+- Create `server/backend/dataminr/state.go` with StateStore implementation for KV operations
+- Write unit tests with mocked KV store
+
+**Completion Criteria**:
+- Dataminr types defined
+- State storage functional
+- All state operations tested
+- All tests passing
+- Lint checks passing
+
+---
+
+### Phase 4: Dataminr Authentication ⬜
+
+**Goal**: Implement authentication manager with token lifecycle.
+
+**Steps**:
+- Create `server/backend/dataminr/auth.go` with AuthManager
+- Implement token acquisition, caching, and proactive refresh
+- Use `application/x-www-form-urlencoded` and `Dmauth` header format
+- Write unit tests using httptest to mock API
+
+**Completion Criteria**:
+- Authentication manager functional
+- Token lifecycle managed correctly
+- All auth scenarios tested
+- All tests passing
+- Lint checks passing
+
+---
+
+### Phase 5: Dataminr API Client ⬜
+
+**Goal**: Implement Dataminr API client for polling alerts.
+
+**Steps**:
+- Create `server/backend/dataminr/client.go` with APIClient
+- Implement cursor-based pagination with alertversion=19
+- Handle various HTTP error responses
+- Write unit tests using httptest
+
+**Completion Criteria**:
+- API client functional
+- Cursor-based pagination working
+- All error scenarios tested
+- All tests passing
+- Lint checks passing
+
+---
+
+### Phase 6: Dataminr Alert Processor ⬜
+
+**Goal**: Implement alert normalization and deduplication.
+
+**Steps**:
+- Create `server/backend/dataminr/processor.go` with AlertProcessor
+- Implement in-memory deduplication cache with cleanup
+- Parse location data, convert timestamps, extract metadata
+- Write unit tests for normalization and deduplication
+
+**Completion Criteria**:
+- Alert normalization working
+- Deduplication functional
+- Metadata extraction correct
+- All tests passing
+- Lint checks passing
+
+---
+
+### Phase 7: Dataminr Poller ⬜
+
+**Goal**: Implement cluster-aware polling job.
+
+**Steps**:
+- Create `server/backend/dataminr/poller.go` with Poller
+- Use Mattermost's cluster scheduled job system
+- Implement poll cycle with cursor tracking and error handling
+- Write unit tests and integration tests
+
+**Completion Criteria**:
+- Poller functional with cluster awareness
+- Error handling and auto-disable working
+- Integration test validates full flow
+- All tests passing
+- Lint checks passing
+
+---
+
+### Phase 8: Dataminr Backend Main ⬜
+
+**Goal**: Implement main Dataminr backend struct.
+
+**Steps**:
+- Create `server/backend/dataminr/dataminr.go` implementing Backend interface
+- Wire together all Dataminr components
+- Implement alert callback for posting to Mattermost (placeholder)
+- Write unit tests and integration tests
+
+**Completion Criteria**:
+- Dataminr backend fully functional
+- All interface methods implemented
+- Integration test validates full backend
+- All tests passing
+- Lint checks passing
+
+---
+
+### Phase 9: Backend Manager & Plugin Integration ⬜
+
+**Goal**: Integrate backends into plugin lifecycle.
+
+**Steps**:
+- Create `server/backend/factory.go` with backend creation logic
+- Update `server/plugin.go` OnActivate, OnDeactivate, OnConfigurationChange
+- Write comprehensive unit tests and integration tests
+
+**Completion Criteria**:
+- Backends managed by plugin
+- Configuration changes handled correctly
+- Integration test validates full plugin behavior
+- All tests passing
+- Lint checks passing
+
+---
+
+### Phase 10: Backend Status API ⬜
+
+**Goal**: Implement REST API endpoint for backend status.
+
+**Steps**:
+- Create `server/api_backends.go` with status handler
+- Update `server/api.go` to register route
+- Implement permission checking and status collection
+- Write unit tests
+
+**Completion Criteria**:
+- API endpoint functional
+- Permission checking working
+- Response format matches spec
+- All tests passing
+- Lint checks passing
+
+---
+
+### Phase 11: Alert Formatter ⬜
+
+**Goal**: Implement alert formatting for Mattermost attachments.
+
+**Steps**:
+- Create `server/formatter/formatter.go` with FormatAlert function
+- Implement color coding, field ordering, text truncation per spec
+- Write unit tests for all alert types and scenarios
+
+**Completion Criteria**:
+- Formatter produces correct attachments
+- Color coding correct for all types
+- All field scenarios tested
+- All tests passing
+- Lint checks passing
+
+---
+
+### Phase 12: Mattermost Poster ⬜
+
+**Goal**: Implement posting alerts to Mattermost channels.
+
+**Steps**:
+- Create `server/poster/poster.go` with Poster implementation
+- Implement error handling for posting failures
+- Integrate poster into Dataminr backend
+- Write unit tests
+
+**Completion Criteria**:
+- Poster functional
+- Alerts posted to correct channels
+- Error handling working
+- All tests passing
+- Lint checks passing
+
+---
+
+### Phase 13: Webapp Admin Console Component ⬜
+
+**Goal**: Implement React component for backend configuration.
+
+**Steps**:
+- Create component structure: `backend_settings.tsx`, `backend_form.tsx`, `backend_list.tsx`
+- Create TypeScript types in `backends.ts`
+- Implement CRUD operations, validation, and status polling
+- Register component in `webapp/src/index.tsx`
+- Update `plugin.json` with Backends setting definition
+- Write component tests
+
+**Completion Criteria**:
+- Admin console component functional
+- CRUD operations working
+- Status display real-time
+- All validation working
+- All tests passing
+- Lint checks passing
+
+---
+
+### Final Steps
+
+After all phases complete:
+
+1. **System Integration Testing**: Manual testing with real Mattermost instance
+2. **Documentation Review**: Update README.md and ensure CLAUDE.md is current
+3. **Final Commit**
+
+---
+
+**End of Implementation Plan**

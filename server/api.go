@@ -7,7 +7,7 @@ import (
 	"github.com/mattermost/mattermost/server/public/plugin"
 )
 
-// ServeHTTP demonstrates a plugin that handles HTTP requests by greeting the world.
+// ServeHTTP handles HTTP requests for the plugin.
 // The root URL is currently <siteUrl>/plugins/com.mattermost.plugin-dataminr/api/v1/.
 func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Request) {
 	router := mux.NewRouter()
@@ -17,7 +17,8 @@ func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Req
 
 	apiRouter := router.PathPrefix("/api/v1").Subrouter()
 
-	apiRouter.HandleFunc("/hello", p.HelloWorld).Methods(http.MethodGet)
+	// API routes will be registered here
+	_ = apiRouter
 
 	router.ServeHTTP(w, r)
 }
@@ -32,11 +33,4 @@ func (p *Plugin) MattermostAuthorizationRequired(next http.Handler) http.Handler
 
 		next.ServeHTTP(w, r)
 	})
-}
-
-func (p *Plugin) HelloWorld(w http.ResponseWriter, r *http.Request) {
-	if _, err := w.Write([]byte("Hello, world!")); err != nil {
-		p.API.LogError("Failed to write response", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
 }

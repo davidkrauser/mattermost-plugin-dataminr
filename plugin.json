@@ -19,8 +19,15 @@
         "bundle_path": "webapp/dist/main.js"
     },
     "settings_schema": {
-        "header": "",
-        "footer": "",
-        "settings": []
+        "header": "Configure backends to monitor for alerts. Each backend polls for events and posts them to a designated Mattermost channel.",
+        "footer": "Note: Configuration changes require a plugin reload to take effect.",
+        "settings": [
+            {
+                "key": "Backends",
+                "display_name": "Backend Configurations",
+                "type": "custom",
+                "help_text": "Configure alert backends to monitor. Each backend independently polls its API and posts alerts to a designated channel."
+            }
+        ]
     }
 }

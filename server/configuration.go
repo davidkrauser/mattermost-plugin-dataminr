@@ -3,7 +3,10 @@ package main
 import (
 	"reflect"
 
+	"github.com/mattermost/mattermost/server/public/plugin"
 	"github.com/pkg/errors"
+
+	"github.com/mattermost/mattermost-plugin-dataminr/server/backend"
 )
 
 // configuration captures the plugin's external configuration as exposed in the Mattermost server
@@ -18,12 +21,22 @@ import (
 // If you add non-reference types to your configuration struct, be sure to rewrite Clone as a deep
 // copy appropriate for your types.
 type configuration struct {
+	// Backends is an array of backend configurations.
+	// Each backend defines a separate alert source to poll and monitor.
+	Backends []backend.Config `json:"backends"`
 }
 
-// Clone shallow copies the configuration. Your implementation may require a deep copy if
-// your configuration has reference types.
+// Clone creates a deep copy of the configuration.
+// This ensures that slice modifications don't affect the original.
 func (c *configuration) Clone() *configuration {
-	var clone = *c
+	clone := *c
+
+	// Deep copy the Backends slice
+	if c.Backends != nil {
+		clone.Backends = make([]backend.Config, len(c.Backends))
+		copy(clone.Backends, c.Backends)
+	}
+
 	return &clone
 }
 
@@ -68,16 +81,79 @@ func (p *Plugin) setConfiguration(configuration *configuration) {
 	p.configuration = configuration
 }
 
+// findBackendConfigByID finds a backend configuration by ID in a slice of configs.
+// Returns the config and true if found, or an empty config and false if not found.
+func findBackendConfigByID(configs []backend.Config, id string) (backend.Config, bool) {
+	for _, cfg := range configs {
+		if cfg.ID == id {
+			return cfg, true
+		}
+	}
+	return backend.Config{}, false
+}
+
+// unregisterBackend unregisters a backend from the registry and logs the result.
+func unregisterBackend(registry *backend.Registry, api plugin.API, id string, reason string) {
+	if err := registry.Unregister(id); err != nil {
+		api.LogWarn("Failed to unregister backend", "id", id, "reason", reason, "error", err.Error())
+	} else {
+		api.LogInfo("Unregistered backend", "id", id, "reason", reason)
+	}
+}
+
 // OnConfigurationChange is invoked when configuration changes may have been made.
 func (p *Plugin) OnConfigurationChange() error {
-	var configuration = new(configuration)
+	var newConfig = new(configuration)
 
 	// Load the public configuration fields from the Mattermost server configuration.
-	if err := p.API.LoadPluginConfiguration(configuration); err != nil {
+	if err := p.API.LoadPluginConfiguration(newConfig); err != nil {
 		return errors.Wrap(err, "failed to load plugin configuration")
 	}
 
-	p.setConfiguration(configuration)
+	// Validate backend configurations
+	if err := backend.ValidateBackends(newConfig.Backends); err != nil {
+		return errors.Wrap(err, "invalid backend configuration")
+	}
+
+	// Get old configuration for comparison
+	oldConfig := p.getConfiguration()
+
+	// Determine which backends need to be added, updated, or removed
+	toAdd, toUpdate, toRemove := backend.DiffBackendConfigs(oldConfig.Backends, newConfig.Backends)
+
+	// Update the configuration before managing backends
+	p.setConfiguration(newConfig)
+
+	// Handle backend lifecycle changes
+	if p.registry != nil {
+		// Remove deleted backends
+		for _, id := range toRemove {
+			unregisterBackend(p.registry, p.API, id, "backend removed from configuration")
+		}
+
+		// Update modified backends (unregister old backend, creation deferred to Phase 9)
+		for _, id := range toUpdate {
+			unregisterBackend(p.registry, p.API, id, "backend configuration changed")
+			if cfg, found := findBackendConfigByID(newConfig.Backends, id); found {
+				// TODO (Phase 9): Create and register updated backend
+				p.API.LogInfo("Backend update pending backend creation",
+					"id", cfg.ID,
+					"name", cfg.Name,
+					"type", cfg.Type)
+			}
+		}
+
+		// Add new backends (creation deferred to Phase 9)
+		for _, id := range toAdd {
+			if cfg, found := findBackendConfigByID(newConfig.Backends, id); found {
+				// TODO (Phase 9): Create and register new backend
+				p.API.LogInfo("New backend pending creation",
+					"id", cfg.ID,
+					"name", cfg.Name,
+					"type", cfg.Type)
+			}
+		}
+	}
 
 	return nil
 }

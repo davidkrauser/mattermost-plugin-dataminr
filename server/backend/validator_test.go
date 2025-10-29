@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
@@ -9,120 +8,89 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestValidateBackendsJSON_Valid(t *testing.T) {
+func TestValidateBackends_Valid(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected int // number of backends expected
+		name  string
+		input []Config
 	}{
 		{
-			name:     "empty configuration",
-			input:    "",
-			expected: 0,
+			name:  "empty configuration",
+			input: nil,
 		},
 		{
-			name:     "empty array",
-			input:    "[]",
-			expected: 0,
+			name:  "empty array",
+			input: []Config{},
 		},
 		{
 			name: "single valid backend",
-			input: `[{
-				"id": "550e8400-e29b-41d4-a716-446655440000",
-				"name": "Test Backend",
-				"type": "dataminr",
-				"enabled": true,
-				"url": "https://api.example.com",
-				"apiId": "test-id",
-				"apiKey": "test-key",
-				"channelId": "channel123",
-				"pollIntervalSeconds": 30
-			}]`,
-			expected: 1,
+			input: []Config{
+				{
+					ID:                  "550e8400-e29b-41d4-a716-446655440000",
+					Name:                "Test Backend",
+					Type:                "dataminr",
+					Enabled:             true,
+					URL:                 "https://api.example.com",
+					APIId:               "test-id",
+					APIKey:              "test-key",
+					ChannelID:           "channel123",
+					PollIntervalSeconds: 30,
+				},
+			},
 		},
 		{
 			name: "multiple valid backends",
-			input: `[
+			input: []Config{
 				{
-					"id": "550e8400-e29b-41d4-a716-446655440000",
-					"name": "Backend One",
-					"type": "dataminr",
-					"enabled": true,
-					"url": "https://api1.example.com",
-					"apiId": "id1",
-					"apiKey": "key1",
-					"channelId": "channel1",
-					"pollIntervalSeconds": 30
+					ID:                  "550e8400-e29b-41d4-a716-446655440000",
+					Name:                "Backend One",
+					Type:                "dataminr",
+					Enabled:             true,
+					URL:                 "https://api1.example.com",
+					APIId:               "id1",
+					APIKey:              "key1",
+					ChannelID:           "channel1",
+					PollIntervalSeconds: 30,
 				},
 				{
-					"id": "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
-					"name": "Backend Two",
-					"type": "dataminr",
-					"enabled": false,
-					"url": "https://api2.example.com",
-					"apiId": "id2",
-					"apiKey": "key2",
-					"channelId": "channel2",
-					"pollIntervalSeconds": 60
-				}
-			]`,
-			expected: 2,
+					ID:                  "6ba7b810-9dad-41d1-80b4-00c04fd430c8",
+					Name:                "Backend Two",
+					Type:                "dataminr",
+					Enabled:             false,
+					URL:                 "https://api2.example.com",
+					APIId:               "id2",
+					APIKey:              "key2",
+					ChannelID:           "channel2",
+					PollIntervalSeconds: 60,
+				},
+			},
 		},
 		{
 			name: "minimum poll interval",
-			input: `[{
-				"id": "550e8400-e29b-41d4-a716-446655440000",
-				"name": "Test Backend",
-				"type": "dataminr",
-				"enabled": true,
-				"url": "https://api.example.com",
-				"apiId": "test-id",
-				"apiKey": "test-key",
-				"channelId": "channel123",
-				"pollIntervalSeconds": 10
-			}]`,
-			expected: 1,
+			input: []Config{
+				{
+					ID:                  "550e8400-e29b-41d4-a716-446655440000",
+					Name:                "Test Backend",
+					Type:                "dataminr",
+					Enabled:             true,
+					URL:                 "https://api.example.com",
+					APIId:               "test-id",
+					APIKey:              "test-key",
+					ChannelID:           "channel123",
+					PollIntervalSeconds: 10,
+				},
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			configs, err := ValidateBackendsJSON(tt.input)
+			err := ValidateBackends(tt.input)
 			require.NoError(t, err)
-			assert.Len(t, configs, tt.expected)
 		})
 	}
 }
 
-func TestValidateBackendsJSON_InvalidJSON(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{
-			name:  "malformed json",
-			input: `[{invalid json}]`,
-		},
-		{
-			name:  "not an array",
-			input: `{"id": "test"}`,
-		},
-		{
-			name:  "unclosed array",
-			input: `[{"id": "test"`,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := ValidateBackendsJSON(tt.input)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "invalid JSON format")
-		})
-	}
-}
-
-func TestValidateBackendsJSON_MissingRequiredFields(t *testing.T) {
+func TestValidateBackends_MissingRequiredFields(t *testing.T) {
 	baseConfig := Config{
 		ID:                  "550e8400-e29b-41d4-a716-446655440000",
 		Name:                "Test Backend",
@@ -172,15 +140,14 @@ func TestValidateBackendsJSON_MissingRequiredFields(t *testing.T) {
 				config.PollIntervalSeconds = 0
 			}
 
-			configJSON, _ := json.Marshal([]Config{config})
-			_, err := ValidateBackendsJSON(string(configJSON))
+			err := ValidateBackends([]Config{config})
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.errorMsg)
 		})
 	}
 }
 
-func TestValidateBackendsJSON_InvalidUUID(t *testing.T) {
+func TestValidateBackends_InvalidUUID(t *testing.T) {
 	tests := []struct {
 		name  string
 		id    string
@@ -222,8 +189,7 @@ func TestValidateBackendsJSON_InvalidUUID(t *testing.T) {
 				PollIntervalSeconds: 30,
 			}
 
-			configJSON, _ := json.Marshal([]Config{config})
-			_, err := ValidateBackendsJSON(string(configJSON))
+			err := ValidateBackends([]Config{config})
 
 			if tt.valid {
 				assert.NoError(t, err)
@@ -235,70 +201,70 @@ func TestValidateBackendsJSON_InvalidUUID(t *testing.T) {
 	}
 }
 
-func TestValidateBackendsJSON_DuplicateIDs(t *testing.T) {
+func TestValidateBackends_DuplicateIDs(t *testing.T) {
 	duplicateID := uuid.New().String()
-	input := `[
+	configs := []Config{
 		{
-			"id": "` + duplicateID + `",
-			"name": "Backend One",
-			"type": "dataminr",
-			"enabled": true,
-			"url": "https://api1.example.com",
-			"apiId": "id1",
-			"apiKey": "key1",
-			"channelId": "channel1",
-			"pollIntervalSeconds": 30
+			ID:                  duplicateID,
+			Name:                "Backend One",
+			Type:                "dataminr",
+			Enabled:             true,
+			URL:                 "https://api1.example.com",
+			APIId:               "id1",
+			APIKey:              "key1",
+			ChannelID:           "channel1",
+			PollIntervalSeconds: 30,
 		},
 		{
-			"id": "` + duplicateID + `",
-			"name": "Backend Two",
-			"type": "dataminr",
-			"enabled": true,
-			"url": "https://api2.example.com",
-			"apiId": "id2",
-			"apiKey": "key2",
-			"channelId": "channel2",
-			"pollIntervalSeconds": 30
-		}
-	]`
+			ID:                  duplicateID,
+			Name:                "Backend Two",
+			Type:                "dataminr",
+			Enabled:             true,
+			URL:                 "https://api2.example.com",
+			APIId:               "id2",
+			APIKey:              "key2",
+			ChannelID:           "channel2",
+			PollIntervalSeconds: 30,
+		},
+	}
 
-	_, err := ValidateBackendsJSON(input)
+	err := ValidateBackends(configs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate backend ID")
 }
 
-func TestValidateBackendsJSON_DuplicateNames(t *testing.T) {
-	input := `[
+func TestValidateBackends_DuplicateNames(t *testing.T) {
+	configs := []Config{
 		{
-			"id": "550e8400-e29b-41d4-a716-446655440000",
-			"name": "Same Name",
-			"type": "dataminr",
-			"enabled": true,
-			"url": "https://api1.example.com",
-			"apiId": "id1",
-			"apiKey": "key1",
-			"channelId": "channel1",
-			"pollIntervalSeconds": 30
+			ID:                  "550e8400-e29b-41d4-a716-446655440000",
+			Name:                "Same Name",
+			Type:                "dataminr",
+			Enabled:             true,
+			URL:                 "https://api1.example.com",
+			APIId:               "id1",
+			APIKey:              "key1",
+			ChannelID:           "channel1",
+			PollIntervalSeconds: 30,
 		},
 		{
-			"id": "6ba7b810-9dad-41d4-80b4-00c04fd430c8",
-			"name": "Same Name",
-			"type": "dataminr",
-			"enabled": true,
-			"url": "https://api2.example.com",
-			"apiId": "id2",
-			"apiKey": "key2",
-			"channelId": "channel2",
-			"pollIntervalSeconds": 30
-		}
-	]`
+			ID:                  "6ba7b810-9dad-41d4-80b4-00c04fd430c8",
+			Name:                "Same Name",
+			Type:                "dataminr",
+			Enabled:             true,
+			URL:                 "https://api2.example.com",
+			APIId:               "id2",
+			APIKey:              "key2",
+			ChannelID:           "channel2",
+			PollIntervalSeconds: 30,
+		},
+	}
 
-	_, err := ValidateBackendsJSON(input)
+	err := ValidateBackends(configs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate backend name")
 }
 
-func TestValidateBackendsJSON_UnsupportedType(t *testing.T) {
+func TestValidateBackends_UnsupportedType(t *testing.T) {
 	config := Config{
 		ID:                  uuid.New().String(),
 		Name:                "Test Backend",
@@ -311,14 +277,13 @@ func TestValidateBackendsJSON_UnsupportedType(t *testing.T) {
 		PollIntervalSeconds: 30,
 	}
 
-	configJSON, _ := json.Marshal([]Config{config})
-	_, err := ValidateBackendsJSON(string(configJSON))
+	err := ValidateBackends([]Config{config})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported type")
 	assert.Contains(t, err.Error(), "dataminr")
 }
 
-func TestValidateBackendsJSON_InvalidURL(t *testing.T) {
+func TestValidateBackends_InvalidURL(t *testing.T) {
 	tests := []struct {
 		name     string
 		url      string
@@ -360,15 +325,14 @@ func TestValidateBackendsJSON_InvalidURL(t *testing.T) {
 				PollIntervalSeconds: 30,
 			}
 
-			configJSON, _ := json.Marshal([]Config{config})
-			_, err := ValidateBackendsJSON(string(configJSON))
+			err := ValidateBackends([]Config{config})
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.errorMsg)
 		})
 	}
 }
 
-func TestValidateBackendsJSON_PollIntervalTooLow(t *testing.T) {
+func TestValidateBackends_PollIntervalTooLow(t *testing.T) {
 	config := Config{
 		ID:                  uuid.New().String(),
 		Name:                "Test Backend",
@@ -381,8 +345,7 @@ func TestValidateBackendsJSON_PollIntervalTooLow(t *testing.T) {
 		PollIntervalSeconds: 5, // Below minimum of 10
 	}
 
-	configJSON, _ := json.Marshal([]Config{config})
-	_, err := ValidateBackendsJSON(string(configJSON))
+	err := ValidateBackends([]Config{config})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "must be at least 10 seconds")
 }

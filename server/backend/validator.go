@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 
@@ -13,18 +12,12 @@ var SupportedBackendTypes = map[string]bool{
 	"dataminr": true,
 }
 
-// ValidateBackendsJSON validates the backends JSON string and returns parsed configs.
+// ValidateBackends validates backend configurations.
 // This performs all validation steps defined in the specification.
-func ValidateBackendsJSON(backendsJSON string) ([]Config, error) {
-	if backendsJSON == "" {
+func ValidateBackends(configs []Config) error {
+	if len(configs) == 0 {
 		// Empty configuration is valid - no backends configured
-		return []Config{}, nil
-	}
-
-	// Step 1: Parse JSON
-	var configs []Config
-	if err := json.Unmarshal([]byte(backendsJSON), &configs); err != nil {
-		return nil, fmt.Errorf("invalid JSON format in Backends configuration: %w", err)
+		return nil
 	}
 
 	// Step 2-8: Validate each backend and check for duplicates
@@ -34,44 +27,44 @@ func ValidateBackendsJSON(backendsJSON string) ([]Config, error) {
 	for i, config := range configs {
 		// Step 2: Required fields
 		if err := validateRequiredFields(config); err != nil {
-			return nil, fmt.Errorf("backend configuration at position %d: %w", i+1, err)
+			return fmt.Errorf("backend configuration at position %d: %w", i+1, err)
 		}
 
 		// Step 3: UUID format
 		if err := validateUUID(config.ID); err != nil {
-			return nil, fmt.Errorf("backend '%s': %w", config.Name, err)
+			return fmt.Errorf("backend '%s': %w", config.Name, err)
 		}
 
 		// Step 4: Duplicate IDs
 		if seenIDs[config.ID] {
-			return nil, fmt.Errorf("duplicate backend ID found: %s", config.ID)
+			return fmt.Errorf("duplicate backend ID found: %s", config.ID)
 		}
 		seenIDs[config.ID] = true
 
 		// Step 5: Duplicate names
 		if seenNames[config.Name] {
-			return nil, fmt.Errorf("duplicate backend name found: '%s'", config.Name)
+			return fmt.Errorf("duplicate backend name found: '%s'", config.Name)
 		}
 		seenNames[config.Name] = true
 
 		// Step 6: Type support
 		if !SupportedBackendTypes[config.Type] {
-			return nil, fmt.Errorf("backend '%s': unsupported type '%s' (only 'dataminr' is currently supported)", config.Name, config.Type)
+			return fmt.Errorf("backend '%s': unsupported type '%s' (only 'dataminr' is currently supported)", config.Name, config.Type)
 		}
 
 		// Step 7: URL format
 		if err := validateURL(config.URL); err != nil {
-			return nil, fmt.Errorf("backend '%s': %w", config.Name, err)
+			return fmt.Errorf("backend '%s': %w", config.Name, err)
 		}
 
 		// Step 8: Poll interval minimum
 		if config.PollIntervalSeconds < MinPollIntervalSeconds {
-			return nil, fmt.Errorf("backend '%s': poll interval must be at least %d seconds (got %d)",
+			return fmt.Errorf("backend '%s': poll interval must be at least %d seconds (got %d)",
 				config.Name, MinPollIntervalSeconds, config.PollIntervalSeconds)
 		}
 	}
 
-	return configs, nil
+	return nil
 }
 
 // validateRequiredFields checks that all required fields are present and non-empty

@@ -610,7 +610,7 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 | 6 | ✅ Complete | Dataminr Alert Processor |
 | 7 | ✅ Complete | Dataminr Poller |
 | 8 | ✅ Complete | Dataminr Backend Main |
-| 9 | ⬜ Not Started | Backend Manager & Plugin Integration |
+| 9 | ✅ Complete | Backend Manager & Plugin Integration |
 | 10 | ⬜ Not Started | Backend Status API |
 | 11 | ⬜ Not Started | Alert Formatter |
 | 12 | ⬜ Not Started | Mattermost Poster |
@@ -771,21 +771,18 @@ Implemented main Dataminr backend with:
 
 ---
 
-### Phase 9: Backend Manager & Plugin Integration ⬜
+### Phase 9: Backend Manager & Plugin Integration ✅
 
-**Goal**: Integrate backends into plugin lifecycle.
+**Status**: Complete
+**Commits**: 3a492a7, feaae8a
 
-**Steps**:
-- Create `server/backend/factory.go` with backend creation logic
-- Update `server/plugin.go` OnActivate, OnDeactivate, OnConfigurationChange
-- Write comprehensive unit tests and integration tests
-
-**Completion Criteria**:
-- Backends managed by plugin
-- Configuration changes handled correctly
-- Integration test validates full plugin behavior
-- All tests passing
-- Lint checks passing
+Integrated backends into plugin lifecycle:
+- Backend factory with registration system (`backend.Create()`)
+- Dataminr backend auto-registers via `init()` function
+- `OnActivate` initializes backends from configuration
+- `OnConfigurationChange` handles backend add/update/remove operations
+- `createAndStartBackend` helper for backend creation, registration, and startup
+- All tests and lint checks passing
 
 ---
 

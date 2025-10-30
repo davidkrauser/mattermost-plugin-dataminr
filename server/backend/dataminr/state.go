@@ -190,6 +190,67 @@ func (s *StateStore) GetFailures() (int, error) {
 	return count, nil
 }
 
+// SaveLastSuccess stores the timestamp of the last successful poll
+func (s *StateStore) SaveLastSuccess(t time.Time) error {
+	key := fmt.Sprintf("backend_%s_last_success", s.backendID)
+	data, err := json.Marshal(t)
+	if err != nil {
+		return fmt.Errorf("failed to marshal last success time: %w", err)
+	}
+
+	if err := s.api.KVSet(key, data); err != nil {
+		return fmt.Errorf("failed to save last success time: %w", err)
+	}
+
+	return nil
+}
+
+// GetLastSuccess retrieves the timestamp of the last successful poll
+// Returns zero time if no success time is stored
+func (s *StateStore) GetLastSuccess() (time.Time, error) {
+	key := fmt.Sprintf("backend_%s_last_success", s.backendID)
+	data, err := s.api.KVGet(key)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to get last success time: %w", err)
+	}
+
+	if data == nil {
+		return time.Time{}, nil
+	}
+
+	var t time.Time
+	if err := json.Unmarshal(data, &t); err != nil {
+		return time.Time{}, fmt.Errorf("failed to unmarshal last success time: %w", err)
+	}
+
+	return t, nil
+}
+
+// SaveLastError stores the error message from the most recent failure
+func (s *StateStore) SaveLastError(errMsg string) error {
+	key := fmt.Sprintf("backend_%s_last_error", s.backendID)
+	if err := s.api.KVSet(key, []byte(errMsg)); err != nil {
+		return fmt.Errorf("failed to save last error: %w", err)
+	}
+	return nil
+}
+
+// GetLastError retrieves the error message from the most recent failure
+// Returns empty string if no error is stored
+func (s *StateStore) GetLastError() (string, error) {
+	key := fmt.Sprintf("backend_%s_last_error", s.backendID)
+	data, err := s.api.KVGet(key)
+	if err != nil {
+		return "", fmt.Errorf("failed to get last error: %w", err)
+	}
+
+	if data == nil {
+		return "", nil
+	}
+
+	return string(data), nil
+}
+
 // ClearAll removes all state for this backend from the KV store
 // Useful when a backend is being removed
 func (s *StateStore) ClearAll() error {
@@ -197,7 +258,9 @@ func (s *StateStore) ClearAll() error {
 		fmt.Sprintf("backend_%s_auth", s.backendID),
 		fmt.Sprintf("backend_%s_cursor", s.backendID),
 		fmt.Sprintf("backend_%s_last_poll", s.backendID),
+		fmt.Sprintf("backend_%s_last_success", s.backendID),
 		fmt.Sprintf("backend_%s_failures", s.backendID),
+		fmt.Sprintf("backend_%s_last_error", s.backendID),
 	}
 
 	for _, key := range keys {

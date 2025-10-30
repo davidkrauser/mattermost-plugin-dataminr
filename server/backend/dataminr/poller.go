@@ -19,14 +19,14 @@ type AlertFetcher interface {
 // Poller manages the cluster-aware scheduled polling job for a Dataminr backend
 type Poller struct {
 	api         *pluginapi.Client
-	papi        plugin.API
 	backendID   string
 	backendName string
 	interval    time.Duration
 	client      AlertFetcher
 	processor   *AlertProcessor
 	stateStore  *StateStore
-	job         *cluster.Job
+	scheduler   JobScheduler
+	job         Job
 }
 
 // NewPoller creates a new poller instance
@@ -42,14 +42,19 @@ func NewPoller(
 ) *Poller {
 	return &Poller{
 		api:         api,
-		papi:        papi,
 		backendID:   backendID,
 		backendName: backendName,
 		interval:    interval,
 		client:      client,
 		processor:   processor,
 		stateStore:  stateStore,
+		scheduler:   NewClusterJobScheduler(papi),
 	}
+}
+
+// SetScheduler sets a custom job scheduler (useful for testing)
+func (p *Poller) SetScheduler(scheduler JobScheduler) {
+	p.scheduler = scheduler
 }
 
 // Start begins the polling job using Mattermost's cluster job system
@@ -62,7 +67,7 @@ func (p *Poller) Start() error {
 	jobID := fmt.Sprintf("dataminr_poll_%s", p.backendID)
 
 	// Schedule the recurring job with cluster awareness
-	job, err := cluster.Schedule(p.papi, jobID, p.nextWaitInterval, p.run)
+	job, err := p.scheduler.Schedule(jobID, p.nextWaitInterval, p.run)
 	if err != nil {
 		return fmt.Errorf("failed to schedule cluster job: %w", err)
 	}
@@ -140,9 +145,20 @@ func (p *Poller) run() {
 		}
 	}
 
-	// Poll succeeded - reset failure counter
+	// Poll succeeded - update success state
+	now := time.Now()
+	if err := p.stateStore.SaveLastSuccess(now); err != nil {
+		p.api.Log.Error("Failed to save last success time", "backendId", p.backendID, "error", err.Error())
+	}
+
+	// Reset failure counter
 	if err := p.stateStore.ResetFailures(); err != nil {
 		p.api.Log.Error("Failed to reset failure counter", "backendId", p.backendID, "error", err.Error())
+	}
+
+	// Clear last error on success
+	if err := p.stateStore.SaveLastError(""); err != nil {
+		p.api.Log.Error("Failed to clear last error", "backendId", p.backendID, "error", err.Error())
 	}
 
 	p.api.Log.Debug("Poll cycle completed",
@@ -155,10 +171,19 @@ func (p *Poller) run() {
 
 // handlePollError increments failure count and disables backend if threshold exceeded
 func (p *Poller) handlePollError(err error) {
+	errMsg := err.Error()
+
 	p.api.Log.Error("Poll cycle failed",
 		"backendId", p.backendID,
 		"backendName", p.backendName,
-		"error", err.Error())
+		"error", errMsg)
+
+	// Save error message
+	if saveErr := p.stateStore.SaveLastError(errMsg); saveErr != nil {
+		p.api.Log.Error("Failed to save last error",
+			"backendId", p.backendID,
+			"error", saveErr.Error())
+	}
 
 	// Increment failure counter
 	failureCount, incrementErr := p.stateStore.IncrementFailures()
@@ -175,7 +200,7 @@ func (p *Poller) handlePollError(err error) {
 			"backendId", p.backendID,
 			"backendName", p.backendName,
 			"consecutiveFailures", failureCount,
-			"lastError", err.Error())
+			"lastError", errMsg)
 
 		// Stop the poller
 		if stopErr := p.Stop(); stopErr != nil {

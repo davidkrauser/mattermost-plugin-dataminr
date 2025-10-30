@@ -46,8 +46,9 @@ func TestPostAlert_Success(t *testing.T) {
 		return true
 	})).Return(&model.Post{}, nil)
 
-	// Call PostAlert
-	err := PostAlert(api, botID, alert, channelID)
+	// Create poster and call PostAlert
+	poster := New(api, botID)
+	err := poster.PostAlert(alert, channelID)
 
 	// Verify no error
 	require.NoError(t, err)
@@ -77,8 +78,9 @@ func TestPostAlert_CreatePostError(t *testing.T) {
 	}
 	api.On("CreatePost", mock.Anything).Return(nil, expectedErr)
 
-	// Call PostAlert
-	err := PostAlert(api, botID, alert, channelID)
+	// Create poster and call PostAlert
+	poster := New(api, botID)
+	err := poster.PostAlert(alert, channelID)
 
 	// Verify error is returned
 	require.Error(t, err)
@@ -110,8 +112,9 @@ func TestPostAlert_ChannelNotFound(t *testing.T) {
 	}
 	api.On("CreatePost", mock.Anything).Return(nil, expectedErr)
 
-	// Call PostAlert
-	err := PostAlert(api, botID, alert, channelID)
+	// Create poster and call PostAlert
+	poster := New(api, botID)
+	err := poster.PostAlert(alert, channelID)
 
 	// Verify error is returned
 	require.Error(t, err)
@@ -143,8 +146,9 @@ func TestPostAlert_PermissionError(t *testing.T) {
 	}
 	api.On("CreatePost", mock.Anything).Return(nil, expectedErr)
 
-	// Call PostAlert
-	err := PostAlert(api, botID, alert, channelID)
+	// Create poster and call PostAlert
+	poster := New(api, botID)
+	err := poster.PostAlert(alert, channelID)
 
 	// Verify error is returned
 	require.Error(t, err)
@@ -198,8 +202,9 @@ func TestPostAlert_WithRichAlert(t *testing.T) {
 		return true
 	})).Return(&model.Post{}, nil)
 
-	// Call PostAlert
-	err := PostAlert(api, botID, alert, channelID)
+	// Create poster and call PostAlert
+	poster := New(api, botID)
+	err := poster.PostAlert(alert, channelID)
 
 	// Verify no error
 	require.NoError(t, err)

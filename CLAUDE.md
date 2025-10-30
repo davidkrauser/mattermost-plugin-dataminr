@@ -612,7 +612,7 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 | 8 | ✅ Complete | Dataminr Backend Main |
 | 9 | ✅ Complete | Backend Manager & Plugin Integration |
 | 10 | ✅ Complete | Backend Status API |
-| 11 | ⬜ Not Started | Alert Formatter |
+| 11 | ✅ Complete | Alert Formatter |
 | 12 | ⬜ Not Started | Mattermost Poster |
 | 13 | ⬜ Not Started | Webapp Admin Console Component |
 
@@ -800,21 +800,19 @@ Implemented REST API endpoint for backend status:
 
 ---
 
-### Phase 11: Alert Formatter ⬜
+### Phase 11: Alert Formatter ✅
 
-**Goal**: Implement alert formatting for Mattermost attachments.
+**Status**: Complete
+**Commits**: fcfc7c3
 
-**Steps**:
-- Create `server/formatter/formatter.go` with FormatAlert function
-- Implement color coding, field ordering, text truncation per spec
-- Write unit tests for all alert types and scenarios
-
-**Completion Criteria**:
-- Formatter produces correct attachments
-- Color coding correct for all types
-- All field scenarios tested
-- All tests passing
-- Lint checks passing
+Implemented alert formatter with rich Mattermost formatting:
+- FormatAlert function converting backend.Alert to SlackAttachment
+- Color coding and emoji indicators for alert types (Flash=Red 🔴, Urgent=Orange 🟠, Alert=Yellow 🟡)
+- Structured field layout with proper short/long field handling
+- Location formatting, bulleted lists, text truncation
+- Media handling with first image embedded
+- Comprehensive unit tests covering all scenarios
+- All tests and lint checks passing
 
 ---
 

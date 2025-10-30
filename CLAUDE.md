@@ -583,7 +583,7 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 | 3 | ✅ Complete | Dataminr Types & State |
 | 4 | ✅ Complete | Dataminr Authentication |
 | 5 | ✅ Complete | Dataminr API Client |
-| 6 | ⬜ Not Started | Dataminr Alert Processor |
+| 6 | ✅ Complete | Dataminr Alert Processor |
 | 7 | ⬜ Not Started | Dataminr Poller |
 | 8 | ⬜ Not Started | Dataminr Backend Main |
 | 9 | ⬜ Not Started | Backend Manager & Plugin Integration |
@@ -692,22 +692,25 @@ Implemented Dataminr API client with:
 
 ---
 
-### Phase 6: Dataminr Alert Processor ⬜
+### Phase 6: Dataminr Alert Processor ✅
 
-**Goal**: Implement alert normalization and deduplication.
+**Status**: Complete
+**Commits**: 7367452
 
-**Steps**:
-- Create `server/backend/dataminr/processor.go` with AlertProcessor
-- Implement in-memory deduplication cache with cleanup
-- Parse location data, convert timestamps, extract metadata
-- Write unit tests for normalization and deduplication
-
-**Completion Criteria**:
-- Alert normalization working
-- Deduplication functional
-- Metadata extraction correct
-- All tests passing
-- Lint checks passing
+Implemented alert processing with three focused components:
+- **Adapter** (`adapter.go`): Pure functions converting Dataminr alerts to normalized backend.Alert format
+  - Extracts all metadata (topics, lists, linked alerts, sub-headlines)
+  - Converts miles to meters for location confidence radius
+  - Formats sub-headlines with markdown
+- **Deduplicator** (`deduplicator.go`): In-memory cache with automatic cleanup
+  - Tracks seen alert IDs with timestamps
+  - Cleanup every 10 minutes, removes entries older than 1 hour
+  - Thread-safe with RWMutex
+- **Processor** (`processor.go`): Orchestrates normalization, deduplication, and alert handling
+  - Processes alert batches, skips duplicates, continues on handler errors
+  - Calls alert handler callback for each new alert
+- Comprehensive unit tests covering all field combinations, deduplication, error handling, and concurrent access
+- All tests and lint checks passing
 
 ---
 

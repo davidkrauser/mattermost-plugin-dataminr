@@ -1,0 +1,187 @@
+package dataminr
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/mattermost/mattermost/server/public/plugin"
+	"github.com/mattermost/mattermost/server/public/pluginapi"
+	"github.com/mattermost/mattermost/server/public/pluginapi/cluster"
+
+	"github.com/mattermost/mattermost-plugin-dataminr/server/backend"
+)
+
+// AlertFetcher is an interface for fetching alerts from the Dataminr API
+type AlertFetcher interface {
+	FetchAlerts(cursor string) (*AlertsResponse, error)
+}
+
+// Poller manages the cluster-aware scheduled polling job for a Dataminr backend
+type Poller struct {
+	api         *pluginapi.Client
+	papi        plugin.API
+	backendID   string
+	backendName string
+	interval    time.Duration
+	client      AlertFetcher
+	processor   *AlertProcessor
+	stateStore  *StateStore
+	job         *cluster.Job
+}
+
+// NewPoller creates a new poller instance
+func NewPoller(
+	api *pluginapi.Client,
+	papi plugin.API,
+	backendID string,
+	backendName string,
+	interval time.Duration,
+	client AlertFetcher,
+	processor *AlertProcessor,
+	stateStore *StateStore,
+) *Poller {
+	return &Poller{
+		api:         api,
+		papi:        papi,
+		backendID:   backendID,
+		backendName: backendName,
+		interval:    interval,
+		client:      client,
+		processor:   processor,
+		stateStore:  stateStore,
+	}
+}
+
+// Start begins the polling job using Mattermost's cluster job system
+// This ensures only one server instance polls in a multi-server cluster
+func (p *Poller) Start() error {
+	if p.job != nil {
+		return fmt.Errorf("poller already running")
+	}
+
+	jobID := fmt.Sprintf("dataminr_poll_%s", p.backendID)
+
+	// Schedule the recurring job with cluster awareness
+	job, err := cluster.Schedule(p.papi, jobID, p.nextWaitInterval, p.run)
+	if err != nil {
+		return fmt.Errorf("failed to schedule cluster job: %w", err)
+	}
+
+	p.job = job
+	p.api.Log.Info("Poller started", "backendId", p.backendID, "backendName", p.backendName, "interval", p.interval)
+	return nil
+}
+
+// Stop gracefully stops the polling job
+func (p *Poller) Stop() error {
+	if p.job == nil {
+		return nil
+	}
+
+	err := p.job.Close()
+	p.job = nil
+
+	if err != nil {
+		p.api.Log.Error("Failed to close cluster job", "backendId", p.backendID, "error", err.Error())
+		return fmt.Errorf("failed to close cluster job: %w", err)
+	}
+
+	p.api.Log.Info("Poller stopped", "backendId", p.backendID, "backendName", p.backendName)
+	return nil
+}
+
+// nextWaitInterval is called by the cluster job scheduler to determine how long to wait
+// until the next poll. The metadata.LastFinished is automatically set by the cluster scheduler.
+func (p *Poller) nextWaitInterval(now time.Time, metadata cluster.JobMetadata) time.Duration {
+	// For the first run, execute immediately
+	if metadata.LastFinished.IsZero() {
+		return 0
+	}
+
+	// For subsequent runs, wait the full poll interval
+	return p.interval
+}
+
+// run is called by the cluster job scheduler to execute a poll cycle
+func (p *Poller) run() {
+	p.api.Log.Debug("Starting poll cycle", "backendId", p.backendID, "backendName", p.backendName)
+
+	// Update last poll time
+	if err := p.stateStore.SaveLastPoll(time.Now()); err != nil {
+		p.api.Log.Error("Failed to save last poll time", "backendId", p.backendID, "error", err.Error())
+	}
+
+	// Load cursor from state
+	cursor, err := p.stateStore.GetCursor()
+	if err != nil {
+		p.handlePollError(fmt.Errorf("failed to load cursor: %w", err))
+		return
+	}
+
+	// Fetch alerts from API
+	response, err := p.client.FetchAlerts(cursor)
+	if err != nil {
+		p.handlePollError(fmt.Errorf("failed to fetch alerts: %w", err))
+		return
+	}
+
+	// Process alerts
+	newCount, err := p.processor.ProcessAlerts(response.Alerts)
+	if err != nil {
+		p.handlePollError(fmt.Errorf("failed to process alerts: %w", err))
+		return
+	}
+
+	// Save new cursor
+	if response.To != "" {
+		if err := p.stateStore.SaveCursor(response.To); err != nil {
+			p.handlePollError(fmt.Errorf("failed to save cursor: %w", err))
+			return
+		}
+	}
+
+	// Poll succeeded - reset failure counter
+	if err := p.stateStore.ResetFailures(); err != nil {
+		p.api.Log.Error("Failed to reset failure counter", "backendId", p.backendID, "error", err.Error())
+	}
+
+	p.api.Log.Debug("Poll cycle completed",
+		"backendId", p.backendID,
+		"backendName", p.backendName,
+		"totalAlerts", len(response.Alerts),
+		"newAlerts", newCount,
+		"cursor", response.To)
+}
+
+// handlePollError increments failure count and disables backend if threshold exceeded
+func (p *Poller) handlePollError(err error) {
+	p.api.Log.Error("Poll cycle failed",
+		"backendId", p.backendID,
+		"backendName", p.backendName,
+		"error", err.Error())
+
+	// Increment failure counter
+	failureCount, incrementErr := p.stateStore.IncrementFailures()
+	if incrementErr != nil {
+		p.api.Log.Error("Failed to increment failure counter",
+			"backendId", p.backendID,
+			"error", incrementErr.Error())
+		return
+	}
+
+	// Check if backend should be disabled
+	if failureCount >= backend.MaxConsecutiveFailures {
+		p.api.Log.Error("Backend disabled due to consecutive failures",
+			"backendId", p.backendID,
+			"backendName", p.backendName,
+			"consecutiveFailures", failureCount,
+			"lastError", err.Error())
+
+		// Stop the poller
+		if stopErr := p.Stop(); stopErr != nil {
+			p.api.Log.Error("Failed to stop poller after reaching max failures",
+				"backendId", p.backendID,
+				"error", stopErr.Error())
+		}
+	}
+}

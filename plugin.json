@@ -23,6 +23,22 @@
         "footer": "Note: Configuration changes require a plugin reload to take effect.",
         "settings": [
             {
+                "key": "BotUsername",
+                "display_name": "Bot Username",
+                "type": "text",
+                "help_text": "The username that will be displayed for alert notifications.",
+                "placeholder": "dataminr-alerts",
+                "default": "dataminr-alerts"
+            },
+            {
+                "key": "BotDisplayName",
+                "display_name": "Bot Display Name",
+                "type": "text",
+                "help_text": "The display name that will be shown for the alert bot.",
+                "placeholder": "Dataminr Alerts",
+                "default": "Dataminr Alerts"
+            },
+            {
                 "key": "Backends",
                 "display_name": "Backend Configurations",
                 "type": "custom",

@@ -116,7 +116,7 @@ func TestDataminrBackend_FullIntegration(t *testing.T) {
 	}
 
 	// Create backend
-	b, err := New(config, client, mockAPI, mockPoster)
+	b, err := New(config, client, mockAPI, mockPoster, nil)
 	require.NoError(t, err)
 	require.NotNil(t, b)
 
@@ -319,7 +319,7 @@ func TestDataminrBackend_ErrorHandling(t *testing.T) {
 
 	client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
 
-	b, err := New(config, client, mockAPI, &MockPoster{})
+	b, err := New(config, client, mockAPI, &MockPoster{}, nil)
 	require.NoError(t, err)
 
 	t.Run("handle API errors and track failures", func(t *testing.T) {

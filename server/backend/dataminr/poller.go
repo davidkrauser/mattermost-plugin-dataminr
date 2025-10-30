@@ -18,15 +18,16 @@ type AlertFetcher interface {
 
 // Poller manages the cluster-aware scheduled polling job for a Dataminr backend
 type Poller struct {
-	api         *pluginapi.Client
-	backendID   string
-	backendName string
-	interval    time.Duration
-	client      AlertFetcher
-	processor   *AlertProcessor
-	stateStore  *StateStore
-	scheduler   JobScheduler
-	job         Job
+	api             *pluginapi.Client
+	backendID       string
+	backendName     string
+	interval        time.Duration
+	client          AlertFetcher
+	processor       *AlertProcessor
+	stateStore      *StateStore
+	scheduler       JobScheduler
+	job             Job
+	disableCallback backend.DisableCallback
 }
 
 // NewPoller creates a new poller instance
@@ -39,16 +40,18 @@ func NewPoller(
 	client AlertFetcher,
 	processor *AlertProcessor,
 	stateStore *StateStore,
+	disableCallback backend.DisableCallback,
 ) *Poller {
 	return &Poller{
-		api:         api,
-		backendID:   backendID,
-		backendName: backendName,
-		interval:    interval,
-		client:      client,
-		processor:   processor,
-		stateStore:  stateStore,
-		scheduler:   NewClusterJobScheduler(papi),
+		api:             api,
+		backendID:       backendID,
+		backendName:     backendName,
+		interval:        interval,
+		client:          client,
+		processor:       processor,
+		stateStore:      stateStore,
+		scheduler:       NewClusterJobScheduler(papi),
+		disableCallback: disableCallback,
 	}
 }
 
@@ -196,17 +199,36 @@ func (p *Poller) handlePollError(err error) {
 
 	// Check if backend should be disabled
 	if failureCount >= backend.MaxConsecutiveFailures {
-		p.api.Log.Error("Backend disabled due to consecutive failures",
+		p.api.Log.Error("Backend reached max consecutive failures",
 			"backendId", p.backendID,
 			"backendName", p.backendName,
 			"consecutiveFailures", failureCount,
 			"lastError", errMsg)
 
-		// Stop the poller
-		if stopErr := p.Stop(); stopErr != nil {
-			p.api.Log.Error("Failed to stop poller after reaching max failures",
-				"backendId", p.backendID,
-				"error", stopErr.Error())
+		// Call disable callback to persist the configuration change
+		// This will trigger OnConfigurationChange which will stop the backend
+		if p.disableCallback != nil {
+			if disableErr := p.disableCallback(p.backendID); disableErr != nil {
+				p.api.Log.Error("Failed to disable backend in configuration",
+					"backendId", p.backendID,
+					"error", disableErr.Error())
+
+				// Fallback: stop the poller locally if callback fails
+				if stopErr := p.Stop(); stopErr != nil {
+					p.api.Log.Error("Failed to stop poller after callback failure",
+						"backendId", p.backendID,
+						"error", stopErr.Error())
+				}
+			}
+		} else {
+			// Fallback: stop the poller if no callback is provided
+			p.api.Log.Warn("No disable callback provided, stopping poller locally",
+				"backendId", p.backendID)
+			if stopErr := p.Stop(); stopErr != nil {
+				p.api.Log.Error("Failed to stop poller",
+					"backendId", p.backendID,
+					"error", stopErr.Error())
+			}
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"sync"
 
 	"github.com/mattermost/mattermost/server/public/model"
@@ -94,8 +95,8 @@ func (p *Plugin) createAndStartBackend(config backend.Config) {
 		return
 	}
 
-	// Create backend instance using factory
-	b, err := backend.Create(config, p.client, p.API, p.poster)
+	// Create backend instance using factory, passing the disable callback
+	b, err := backend.Create(config, p.client, p.API, p.poster, p.disableBackend)
 	if err != nil {
 		p.API.LogError("Failed to create backend", "id", config.ID, "name", config.Name, "error", err.Error())
 		return
@@ -116,6 +117,53 @@ func (p *Plugin) createAndStartBackend(config backend.Config) {
 	}
 
 	p.API.LogInfo("Backend started successfully", "id", config.ID, "name", config.Name, "type", config.Type)
+}
+
+// disableBackend sets a backend's enabled flag to false and persists the configuration change.
+// This is called when a backend reaches MaxConsecutiveFailures and needs to be auto-disabled.
+// The configuration change will trigger OnConfigurationChange, which will stop the backend.
+func (p *Plugin) disableBackend(backendID string) error {
+	p.configurationLock.Lock()
+	defer p.configurationLock.Unlock()
+
+	if p.configuration == nil {
+		return errors.New("configuration is nil")
+	}
+
+	// Find the backend in the configuration
+	found := false
+	for i := range p.configuration.Backends {
+		if p.configuration.Backends[i].ID == backendID {
+			// Set enabled to false
+			p.configuration.Backends[i].Enabled = false
+			found = true
+			p.API.LogInfo("Disabling backend in configuration", "id", backendID, "name", p.configuration.Backends[i].Name)
+			break
+		}
+	}
+
+	if !found {
+		return errors.Errorf("backend with ID %s not found in configuration", backendID)
+	}
+
+	// Marshal the configuration to map[string]any for SavePluginConfig
+	marshalBytes, err := json.Marshal(p.configuration)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal configuration")
+	}
+
+	configMap := make(map[string]any)
+	if err := json.Unmarshal(marshalBytes, &configMap); err != nil {
+		return errors.Wrap(err, "failed to unmarshal configuration to map")
+	}
+
+	// Persist the configuration change
+	if err := p.client.Configuration.SavePluginConfig(configMap); err != nil {
+		return errors.Wrap(err, "failed to save plugin configuration")
+	}
+
+	p.API.LogInfo("Backend disabled and configuration persisted", "id", backendID)
+	return nil
 }
 
 // See https://developers.mattermost.com/extend/plugins/server/reference/

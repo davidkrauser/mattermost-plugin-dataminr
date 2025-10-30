@@ -28,6 +28,7 @@ func TestPoller_nextWaitInterval(t *testing.T) {
 			nil,
 			nil,
 			nil,
+			nil,
 		)
 
 		now := time.Now()
@@ -50,6 +51,7 @@ func TestPoller_nextWaitInterval(t *testing.T) {
 			"test-backend-id",
 			"Test Backend",
 			pollInterval,
+			nil,
 			nil,
 			nil,
 			nil,
@@ -114,6 +116,7 @@ func TestPoller_run_Success(t *testing.T) {
 		mockClient,
 		processor,
 		stateStore,
+		nil,
 	)
 
 	// Run poll cycle
@@ -158,6 +161,7 @@ func TestPoller_run_FetchError(t *testing.T) {
 		mockClient,
 		processor,
 		stateStore,
+		nil,
 	)
 
 	// Run poll cycle
@@ -194,6 +198,7 @@ func TestPoller_handlePollError_MaxFailures(t *testing.T) {
 		nil,
 		nil,
 		stateStore,
+		nil,
 	)
 
 	// Set failure count to just below threshold
@@ -244,6 +249,7 @@ func TestPoller_handlePollError_BelowThreshold(t *testing.T) {
 		nil,
 		nil,
 		stateStore,
+		nil,
 	)
 
 	// Handle error below threshold

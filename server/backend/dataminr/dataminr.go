@@ -13,8 +13,8 @@ import (
 
 // init registers the Dataminr backend factory
 func init() {
-	backend.RegisterBackendFactory("dataminr", func(config backend.Config, api *pluginapi.Client, papi plugin.API, poster backend.AlertPoster) (backend.Backend, error) {
-		return New(config, api, papi, poster)
+	backend.RegisterBackendFactory("dataminr", func(config backend.Config, api *pluginapi.Client, papi plugin.API, poster backend.AlertPoster, disableCallback backend.DisableCallback) (backend.Backend, error) {
+		return New(config, api, papi, poster, disableCallback)
 	})
 }
 
@@ -34,7 +34,7 @@ type Backend struct {
 }
 
 // New creates a new Dataminr backend instance
-func New(config backend.Config, api *pluginapi.Client, papi plugin.API, poster backend.AlertPoster) (*Backend, error) {
+func New(config backend.Config, api *pluginapi.Client, papi plugin.API, poster backend.AlertPoster, disableCallback backend.DisableCallback) (*Backend, error) {
 	// Validate configuration
 	if config.Type != "dataminr" {
 		return nil, fmt.Errorf("invalid backend type: %s (expected: dataminr)", config.Type)
@@ -97,6 +97,7 @@ func New(config backend.Config, api *pluginapi.Client, papi plugin.API, poster b
 		apiClient,
 		b.processor,
 		stateStore,
+		disableCallback,
 	)
 
 	return b, nil

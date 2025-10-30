@@ -580,7 +580,7 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 | 0 | ✅ Complete | Project Setup & Cleanup |
 | 1 | ✅ Complete | Core Backend Infrastructure |
 | 2 | ✅ Complete | Configuration System |
-| 3 | ⬜ Not Started | Dataminr Types & State |
+| 3 | ✅ Complete | Dataminr Types & State |
 | 4 | ⬜ Not Started | Dataminr Authentication |
 | 5 | ⬜ Not Started | Dataminr API Client |
 | 6 | ⬜ Not Started | Dataminr Alert Processor |
@@ -636,21 +636,24 @@ Implemented comprehensive configuration system with:
 
 ---
 
-### Phase 3: Dataminr Types & State ⬜
+### Phase 3: Dataminr Types & State ✅
 
-**Goal**: Implement Dataminr-specific types and KV state storage.
+**Status**: Complete
+**Commits**: f5600cb, 2b10bc4
 
-**Steps**:
-- Create `server/backend/dataminr/types.go` with Dataminr-specific structs for API responses
-- Create `server/backend/dataminr/state.go` with StateStore implementation for KV operations
-- Write unit tests with mocked KV store
-
-**Completion Criteria**:
-- Dataminr types defined
-- State storage functional
-- All state operations tested
-- All tests passing
-- Lint checks passing
+Implemented Dataminr-specific types and state storage:
+- **Types** (`types.go`): Alert, AuthResponse, APIError, AlertsResponse with custom JSON unmarshaling
+  - Automatic time conversion from milliseconds to time.Time (UTC)
+  - Location parsing from array format [address, lat, lon, confidence, mgrs] to structured Location type
+  - Type alias pattern to prevent infinite recursion in custom unmarshalers
+- **State Store** (`state.go`): KV persistence layer with backend-scoped keys
+  - Auth token storage with expiry tracking
+  - Cursor management for API pagination
+  - Failure counter with increment/reset operations
+  - Last poll timestamp tracking
+  - ClearAll() for backend cleanup
+- Comprehensive unit tests for both types and state operations
+- All tests and lint checks passing
 
 ---
 

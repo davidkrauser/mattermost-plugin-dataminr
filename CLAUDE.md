@@ -611,7 +611,7 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 | 7 | ✅ Complete | Dataminr Poller |
 | 8 | ✅ Complete | Dataminr Backend Main |
 | 9 | ✅ Complete | Backend Manager & Plugin Integration |
-| 10 | ⬜ Not Started | Backend Status API |
+| 10 | ✅ Complete | Backend Status API |
 | 11 | ⬜ Not Started | Alert Formatter |
 | 12 | ⬜ Not Started | Mattermost Poster |
 | 13 | ⬜ Not Started | Webapp Admin Console Component |
@@ -786,22 +786,17 @@ Integrated backends into plugin lifecycle:
 
 ---
 
-### Phase 10: Backend Status API ⬜
+### Phase 10: Backend Status API ✅
 
-**Goal**: Implement REST API endpoint for backend status.
+**Status**: Complete
+**Commits**: a7d17f4
 
-**Steps**:
-- Create `server/api_backends.go` with status handler
-- Update `server/api.go` to register route
-- Implement permission checking and status collection
-- Write unit tests
-
-**Completion Criteria**:
-- API endpoint functional
-- Permission checking working
-- Response format matches spec
-- All tests passing
-- Lint checks passing
+Implemented REST API endpoint for backend status:
+- GET `/api/v1/backends/status` endpoint in `server/api.go`
+- Returns map of backend UUIDs to status objects (enabled, poll times, failures, auth state, last error)
+- System admin permission checking in ServeHTTP
+- Empty map response for no configured backends
+- All lint checks passing
 
 ---
 

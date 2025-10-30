@@ -613,7 +613,7 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 | 9 | ✅ Complete | Backend Manager & Plugin Integration |
 | 10 | ✅ Complete | Backend Status API |
 | 11 | ✅ Complete | Alert Formatter |
-| 12 | ⬜ Not Started | Mattermost Poster |
+| 12 | ✅ Complete | Mattermost Poster |
 | 13 | ⬜ Not Started | Webapp Admin Console Component |
 
 ---
@@ -816,22 +816,20 @@ Implemented alert formatter with rich Mattermost formatting:
 
 ---
 
-### Phase 12: Mattermost Poster ⬜
+### Phase 12: Mattermost Poster ✅
 
-**Goal**: Implement posting alerts to Mattermost channels.
+**Status**: Complete
+**Commits**: 4362a3c, 0669b62, e8187ef, 583a25b, 4836f15, 9fffaae
 
-**Steps**:
-- Create `server/poster/poster.go` with Poster implementation
-- Implement error handling for posting failures
-- Integrate poster into Dataminr backend
-- Write unit tests
-
-**Completion Criteria**:
-- Poster functional
-- Alerts posted to correct channels
-- Error handling working
-- All tests passing
-- Lint checks passing
+Implemented Mattermost poster with:
+- **Poster package** (`server/poster/poster.go`) with stateless Poster struct holding API and botID
+- **Bot configuration** in plugin.json with username and display name settings
+- **Bot initialization** in Plugin.OnActivate using EnsureBotUser API
+- **AlertPoster interface** in backend package for dependency injection
+- **Backend integration** with poster passed through factory to all backends
+- **Direct posting** from AlertProcessor calling poster.PostAlert with channelID
+- **Comprehensive tests** for poster functionality and error handling
+- All tests and lint checks passing
 
 ---
 

@@ -581,7 +581,7 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 | 1 | ✅ Complete | Core Backend Infrastructure |
 | 2 | ✅ Complete | Configuration System |
 | 3 | ✅ Complete | Dataminr Types & State |
-| 4 | ⬜ Not Started | Dataminr Authentication |
+| 4 | ✅ Complete | Dataminr Authentication |
 | 5 | ⬜ Not Started | Dataminr API Client |
 | 6 | ⬜ Not Started | Dataminr Alert Processor |
 | 7 | ⬜ Not Started | Dataminr Poller |
@@ -657,22 +657,21 @@ Implemented Dataminr-specific types and state storage:
 
 ---
 
-### Phase 4: Dataminr Authentication ⬜
+### Phase 4: Dataminr Authentication ✅
 
-**Goal**: Implement authentication manager with token lifecycle.
+**Status**: Complete
+**Commits**: ab45ce4
 
-**Steps**:
-- Create `server/backend/dataminr/auth.go` with AuthManager
-- Implement token acquisition, caching, and proactive refresh
-- Use `application/x-www-form-urlencoded` and `Dmauth` header format
-- Write unit tests using httptest to mock API
-
-**Completion Criteria**:
-- Authentication manager functional
-- Token lifecycle managed correctly
-- All auth scenarios tested
-- All tests passing
-- Lint checks passing
+Implemented Dataminr authentication manager with:
+- AuthManager in `server/backend/dataminr/auth.go` handling token lifecycle
+- Form-encoded POST authentication (critical: `application/x-www-form-urlencoded`, not JSON)
+- Token caching in KV store with expiry tracking
+- Proactive token refresh (5 minute buffer before expiry)
+- `Dmauth` authorization header format (not Bearer)
+- Comprehensive error handling for auth failures (401, 500, network errors)
+- Integration with StateStore for persistence across restarts
+- Full unit test coverage with httptest mocking
+- All tests and lint checks passing
 
 ---
 

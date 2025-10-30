@@ -582,7 +582,7 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 | 2 | ✅ Complete | Configuration System |
 | 3 | ✅ Complete | Dataminr Types & State |
 | 4 | ✅ Complete | Dataminr Authentication |
-| 5 | ⬜ Not Started | Dataminr API Client |
+| 5 | ✅ Complete | Dataminr API Client |
 | 6 | ⬜ Not Started | Dataminr Alert Processor |
 | 7 | ⬜ Not Started | Dataminr Poller |
 | 8 | ⬜ Not Started | Dataminr Backend Main |
@@ -675,22 +675,20 @@ Implemented Dataminr authentication manager with:
 
 ---
 
-### Phase 5: Dataminr API Client ⬜
+### Phase 5: Dataminr API Client ✅
 
-**Goal**: Implement Dataminr API client for polling alerts.
+**Status**: Complete
+**Commits**: 59be662
 
-**Steps**:
-- Create `server/backend/dataminr/client.go` with APIClient
-- Implement cursor-based pagination with alertversion=19
-- Handle various HTTP error responses
-- Write unit tests using httptest
-
-**Completion Criteria**:
-- API client functional
-- Cursor-based pagination working
-- All error scenarios tested
-- All tests passing
-- Lint checks passing
+Implemented Dataminr API client with:
+- APIClient in `server/backend/dataminr/client.go` for polling alerts
+- Cursor-based pagination with hardcoded alertversion=19
+- `Dmauth` authorization header format (not Bearer)
+- Comprehensive HTTP error handling (401, 429, 500, 400)
+- Helper function createTestServerWithAuth for test code reuse
+- Full unit test coverage with httptest mocking
+- Integration tests validated against real dataminr-bridge test API
+- All tests and lint checks passing
 
 ---
 

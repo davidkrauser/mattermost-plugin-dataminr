@@ -173,17 +173,11 @@ func TestPoller_handlePollError_MaxFailures(t *testing.T) {
 	// Track failure count manually since we're mocking KV storage
 	currentFailures := backend.MaxConsecutiveFailures - 1
 
-	// First calls to set up initial failure count
+	// Mocks for setting up initial failure count (IncrementFailures calls in the setup loop)
 	for i := 0; i < backend.MaxConsecutiveFailures-1; i++ {
 		api.On("KVGet", "backend_test-id_failures").Return(nil, nil).Once()
 		api.On("KVSet", "backend_test-id_failures", mock.Anything).Return(nil).Once()
 	}
-
-	// The final increment that reaches threshold
-	api.On("KVGet", "backend_test-id_failures").Return(nil, nil).Once()
-	api.On("KVSet", "backend_test-id_failures", mock.Anything).Run(func(args mock.Arguments) {
-		currentFailures++
-	}).Return(nil).Once()
 
 	client := pluginapi.NewClient(api, &plugintest.Driver{})
 
@@ -206,6 +200,13 @@ func TestPoller_handlePollError_MaxFailures(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
+	// Now mock the final handlePollError call (SaveLastError + IncrementFailures)
+	api.On("KVSet", "backend_test-id_last_error", mock.Anything).Return(nil).Once()
+	api.On("KVGet", "backend_test-id_failures").Return(nil, nil).Once()
+	api.On("KVSet", "backend_test-id_failures", mock.Anything).Run(func(args mock.Arguments) {
+		currentFailures++
+	}).Return(nil).Once()
+
 	// Handle one more error to reach threshold
 	poller.handlePollError(errors.New("test error"))
 
@@ -220,8 +221,9 @@ func TestPoller_handlePollError_BelowThreshold(t *testing.T) {
 	api := plugintest.NewAPI(t)
 	api.On("LogError", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 
-	// Mock single increment
+	// Mock single increment (also includes SaveLastError call)
 	failureCount := 0
+	api.On("KVSet", "backend_test-id_last_error", mock.Anything).Return(nil).Once()
 	api.On("KVGet", "backend_test-id_failures").Return(nil, nil).Once()
 	api.On("KVSet", "backend_test-id_failures", mock.Anything).Run(func(args mock.Arguments) {
 		failureCount = 1

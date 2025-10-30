@@ -254,7 +254,9 @@ func TestStateStore_ClearAll(t *testing.T) {
 			"backend_test-backend-xyz_auth",
 			"backend_test-backend-xyz_cursor",
 			"backend_test-backend-xyz_last_poll",
+			"backend_test-backend-xyz_last_success",
 			"backend_test-backend-xyz_failures",
+			"backend_test-backend-xyz_last_error",
 		}
 
 		for _, key := range expectedKeys {

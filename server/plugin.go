@@ -3,8 +3,10 @@ package main
 import (
 	"sync"
 
+	"github.com/mattermost/mattermost/server/public/model"
 	"github.com/mattermost/mattermost/server/public/plugin"
 	"github.com/mattermost/mattermost/server/public/pluginapi"
+	"github.com/pkg/errors"
 
 	"github.com/mattermost/mattermost-plugin-dataminr/server/backend"
 	_ "github.com/mattermost/mattermost-plugin-dataminr/server/backend/dataminr" // Register dataminr backend factory
@@ -26,6 +28,9 @@ type Plugin struct {
 
 	// registry manages all active backend instances.
 	registry *backend.Registry
+
+	// botID is the ID of the bot user used to post alerts.
+	botID string
 }
 
 // OnActivate is invoked when the plugin is activated. If an error is returned, the plugin will be deactivated.
@@ -33,8 +38,32 @@ func (p *Plugin) OnActivate() error {
 	p.client = pluginapi.NewClient(p.API, p.Driver)
 	p.registry = backend.NewRegistry()
 
-	// Initialize backends from current configuration
+	// Get configuration
 	config := p.getConfiguration()
+
+	// Ensure bot user exists
+	botUsername := config.BotUsername
+	if botUsername == "" {
+		botUsername = "dataminr-alerts"
+	}
+	botDisplayName := config.BotDisplayName
+	if botDisplayName == "" {
+		botDisplayName = "Dataminr Alerts"
+	}
+
+	botID, err := p.API.EnsureBotUser(&model.Bot{
+		Username:    botUsername,
+		DisplayName: botDisplayName,
+		Description: "Bot for posting Dataminr alerts to Mattermost channels",
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to ensure bot user")
+	}
+	p.botID = botID
+
+	p.API.LogInfo("Bot user initialized", "botID", p.botID, "username", botUsername)
+
+	// Initialize backends from current configuration
 	for _, backendConfig := range config.Backends {
 		p.createAndStartBackend(backendConfig)
 	}

@@ -21,6 +21,12 @@ import (
 // If you add non-reference types to your configuration struct, be sure to rewrite Clone as a deep
 // copy appropriate for your types.
 type configuration struct {
+	// BotUsername is the username for the alert notification bot.
+	BotUsername string `json:"botUsername"`
+
+	// BotDisplayName is the display name for the alert notification bot.
+	BotDisplayName string `json:"botDisplayName"`
+
 	// Backends is an array of backend configurations.
 	// Each backend defines a separate alert source to poll and monitor.
 	Backends []backend.Config `json:"backends"`

@@ -11,6 +11,13 @@ import (
 	"github.com/mattermost/mattermost-plugin-dataminr/server/backend"
 )
 
+// init registers the Dataminr backend factory
+func init() {
+	backend.RegisterBackendFactory("dataminr", func(config backend.Config, api *pluginapi.Client, papi plugin.API) (backend.Backend, error) {
+		return New(config, api, papi)
+	})
+}
+
 // Backend implements the backend.Backend interface for Dataminr First Alert API
 type Backend struct {
 	config      backend.Config

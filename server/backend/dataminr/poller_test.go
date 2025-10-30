@@ -94,13 +94,15 @@ func TestPoller_run_Success(t *testing.T) {
 		response: mockResponse,
 	}
 
-	// Create processor with handler that tracks calls
+	// Create processor with poster that tracks calls
 	handlerCalled := false
-	handler := func(alert *backend.Alert) error {
-		handlerCalled = true
-		return nil
+	mockPoster := &MockPoster{
+		PostAlertFn: func(alert backend.Alert, channelID string) error {
+			handlerCalled = true
+			return nil
+		},
 	}
-	processor := NewAlertProcessor(client, "Test Backend", handler)
+	processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
 	defer processor.Stop()
 
 	poller := NewPoller(
@@ -144,7 +146,7 @@ func TestPoller_run_FetchError(t *testing.T) {
 		err: errors.New("API error"),
 	}
 
-	processor := NewAlertProcessor(client, "Test Backend", nil)
+	processor := NewAlertProcessor(client, "Test Backend", &MockPoster{}, "test-channel-id")
 	defer processor.Stop()
 
 	poller := NewPoller(

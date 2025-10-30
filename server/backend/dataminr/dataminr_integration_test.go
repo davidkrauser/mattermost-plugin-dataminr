@@ -106,17 +106,19 @@ func TestDataminrBackend_FullIntegration(t *testing.T) {
 
 	client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
 
+	// Track alerts that were posted
+	var postedAlerts []backend.Alert
+	mockPoster := &MockPoster{
+		PostAlertFn: func(alert backend.Alert, channelID string) error {
+			postedAlerts = append(postedAlerts, alert)
+			return nil
+		},
+	}
+
 	// Create backend
-	b, err := New(config, client, mockAPI)
+	b, err := New(config, client, mockAPI, mockPoster)
 	require.NoError(t, err)
 	require.NotNil(t, b)
-
-	// Track alerts that were handled
-	var handledAlerts []*backend.Alert
-	b.processor.alertHandler = func(alert *backend.Alert) error {
-		handledAlerts = append(handledAlerts, alert)
-		return nil
-	}
 
 	// Test authentication
 	t.Run("authenticate with API", func(t *testing.T) {
@@ -157,9 +159,9 @@ func TestDataminrBackend_FullIntegration(t *testing.T) {
 		newCount, err := b.processor.ProcessAlerts(alerts)
 		require.NoError(t, err)
 		assert.Equal(t, 1, newCount)
-		assert.Len(t, handledAlerts, 1)
-		assert.Equal(t, "alert-003", handledAlerts[0].AlertID)
-		assert.Equal(t, "Integration Test Backend", handledAlerts[0].BackendName)
+		assert.Len(t, postedAlerts, 1)
+		assert.Equal(t, "alert-003", postedAlerts[0].AlertID)
+		assert.Equal(t, "Integration Test Backend", postedAlerts[0].BackendName)
 	})
 
 	// Test deduplication
@@ -179,12 +181,12 @@ func TestDataminrBackend_FullIntegration(t *testing.T) {
 			},
 		}
 
-		initialCount := len(handledAlerts)
+		initialCount := len(postedAlerts)
 		newCount, err := b.processor.ProcessAlerts(alerts)
 		require.NoError(t, err)
 		assert.Equal(t, 1, newCount) // Only 1 new alert (alert-004)
-		assert.Len(t, handledAlerts, initialCount+1)
-		assert.Equal(t, "alert-004", handledAlerts[len(handledAlerts)-1].AlertID)
+		assert.Len(t, postedAlerts, initialCount+1)
+		assert.Equal(t, "alert-004", postedAlerts[len(postedAlerts)-1].AlertID)
 	})
 
 	// Test full poll cycle with mock scheduler
@@ -206,7 +208,7 @@ func TestDataminrBackend_FullIntegration(t *testing.T) {
 
 		// Manually trigger poll callback
 		require.NotNil(t, pollCallback)
-		initialHandledCount := len(handledAlerts)
+		initialHandledCount := len(postedAlerts)
 		pollCallback()
 
 		// Verify poll was executed
@@ -231,7 +233,7 @@ func TestDataminrBackend_FullIntegration(t *testing.T) {
 		assert.Equal(t, 0, failures)
 
 		// Check that new alerts were handled (2 from the mock server)
-		assert.Greater(t, len(handledAlerts), initialHandledCount)
+		assert.Greater(t, len(postedAlerts), initialHandledCount)
 
 		// Stop the backend
 		err = b.Stop()
@@ -317,7 +319,7 @@ func TestDataminrBackend_ErrorHandling(t *testing.T) {
 
 	client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
 
-	b, err := New(config, client, mockAPI)
+	b, err := New(config, client, mockAPI, &MockPoster{})
 	require.NoError(t, err)
 
 	t.Run("handle API errors and track failures", func(t *testing.T) {

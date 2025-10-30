@@ -7,8 +7,14 @@ import (
 	"github.com/mattermost/mattermost/server/public/pluginapi"
 )
 
+// AlertPoster is an interface for posting alerts to Mattermost channels.
+// This abstraction allows backends to post alerts without directly depending on the poster package.
+type AlertPoster interface {
+	PostAlert(alert Alert, channelID string) error
+}
+
 // Factory is a function type that creates a backend instance
-type Factory func(config Config, api *pluginapi.Client, papi plugin.API) (Backend, error)
+type Factory func(config Config, api *pluginapi.Client, papi plugin.API, poster AlertPoster) (Backend, error)
 
 // factoryRegistry maps backend types to their factory functions
 var factoryRegistry = make(map[string]Factory)
@@ -21,7 +27,7 @@ func RegisterBackendFactory(backendType string, factory Factory) {
 
 // Create creates a new backend instance based on the provided configuration.
 // Returns an error if the backend type is unknown or if creation fails.
-func Create(config Config, api *pluginapi.Client, papi plugin.API) (Backend, error) {
+func Create(config Config, api *pluginapi.Client, papi plugin.API, poster AlertPoster) (Backend, error) {
 	if config.Type == "" {
 		return nil, fmt.Errorf("backend type is required")
 	}
@@ -31,5 +37,5 @@ func Create(config Config, api *pluginapi.Client, papi plugin.API) (Backend, err
 		return nil, fmt.Errorf("unknown backend type: %s", config.Type)
 	}
 
-	return factory(config, api, papi)
+	return factory(config, api, papi, poster)
 }

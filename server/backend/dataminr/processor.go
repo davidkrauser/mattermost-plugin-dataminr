@@ -10,17 +10,19 @@ import (
 type AlertProcessor struct {
 	api          *pluginapi.Client
 	backendName  string
+	poster       backend.AlertPoster
+	channelID    string
 	deduplicator *Deduplicator
-	alertHandler func(*backend.Alert) error
 }
 
 // NewAlertProcessor creates a new alert processor
-func NewAlertProcessor(api *pluginapi.Client, backendName string, alertHandler func(*backend.Alert) error) *AlertProcessor {
+func NewAlertProcessor(api *pluginapi.Client, backendName string, poster backend.AlertPoster, channelID string) *AlertProcessor {
 	return &AlertProcessor{
 		api:          api,
 		backendName:  backendName,
+		poster:       poster,
+		channelID:    channelID,
 		deduplicator: NewDeduplicator(api),
-		alertHandler: alertHandler,
 	}
 }
 
@@ -42,14 +44,13 @@ func (p *AlertProcessor) ProcessAlerts(alerts []Alert) (int, error) {
 		// Normalize to backend.Alert
 		normalized := NormalizeAlert(alert, p.backendName)
 
-		// Call the alert handler (typically posts to Mattermost)
-		if p.alertHandler != nil {
-			if err := p.alertHandler(normalized); err != nil {
-				p.api.Log.Error("Failed to handle alert", "alertId", alert.AlertID, "error", err.Error())
-				continue
-			}
+		// Post alert to Mattermost channel
+		if err := p.poster.PostAlert(*normalized, p.channelID); err != nil {
+			p.api.Log.Error("Failed to post alert", "alertId", alert.AlertID, "channelId", p.channelID, "error", err.Error())
+			continue
 		}
 
+		p.api.Log.Debug("Successfully posted alert", "alertId", alert.AlertID, "channelId", p.channelID)
 		newCount++
 	}
 

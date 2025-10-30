@@ -10,6 +10,7 @@ import (
 
 	"github.com/mattermost/mattermost-plugin-dataminr/server/backend"
 	_ "github.com/mattermost/mattermost-plugin-dataminr/server/backend/dataminr" // Register dataminr backend factory
+	"github.com/mattermost/mattermost-plugin-dataminr/server/poster"
 )
 
 // Plugin implements the interface expected by the Mattermost server to communicate between the server and plugin processes.
@@ -29,8 +30,8 @@ type Plugin struct {
 	// registry manages all active backend instances.
 	registry *backend.Registry
 
-	// botID is the ID of the bot user used to post alerts.
-	botID string
+	// poster posts alerts to Mattermost channels.
+	poster backend.AlertPoster
 }
 
 // OnActivate is invoked when the plugin is activated. If an error is returned, the plugin will be deactivated.
@@ -59,9 +60,11 @@ func (p *Plugin) OnActivate() error {
 	if err != nil {
 		return errors.Wrap(err, "failed to ensure bot user")
 	}
-	p.botID = botID
 
-	p.API.LogInfo("Bot user initialized", "botID", p.botID, "username", botUsername)
+	p.API.LogInfo("Bot user initialized", "botID", botID, "username", botUsername)
+
+	// Create poster with bot ID
+	p.poster = poster.New(p.API, botID)
 
 	// Initialize backends from current configuration
 	for _, backendConfig := range config.Backends {
@@ -92,7 +95,7 @@ func (p *Plugin) createAndStartBackend(config backend.Config) {
 	}
 
 	// Create backend instance using factory
-	b, err := backend.Create(config, p.client, p.API)
+	b, err := backend.Create(config, p.client, p.API, p.poster)
 	if err != nil {
 		p.API.LogError("Failed to create backend", "id", config.ID, "name", config.Name, "error", err.Error())
 		return

@@ -13,8 +13,8 @@ import (
 
 // init registers the Dataminr backend factory
 func init() {
-	backend.RegisterBackendFactory("dataminr", func(config backend.Config, api *pluginapi.Client, papi plugin.API) (backend.Backend, error) {
-		return New(config, api, papi)
+	backend.RegisterBackendFactory("dataminr", func(config backend.Config, api *pluginapi.Client, papi plugin.API, poster backend.AlertPoster) (backend.Backend, error) {
+		return New(config, api, papi, poster)
 	})
 }
 
@@ -23,6 +23,7 @@ type Backend struct {
 	config      backend.Config
 	api         *pluginapi.Client
 	papi        plugin.API
+	poster      backend.AlertPoster
 	authManager *AuthManager
 	apiClient   *APIClient
 	processor   *AlertProcessor
@@ -33,7 +34,7 @@ type Backend struct {
 }
 
 // New creates a new Dataminr backend instance
-func New(config backend.Config, api *pluginapi.Client, papi plugin.API) (*Backend, error) {
+func New(config backend.Config, api *pluginapi.Client, papi plugin.API, poster backend.AlertPoster) (*Backend, error) {
 	// Validate configuration
 	if config.Type != "dataminr" {
 		return nil, fmt.Errorf("invalid backend type: %s (expected: dataminr)", config.Type)
@@ -75,14 +76,15 @@ func New(config backend.Config, api *pluginapi.Client, papi plugin.API) (*Backen
 		config:      config,
 		api:         api,
 		papi:        papi,
+		poster:      poster,
 		authManager: authManager,
 		apiClient:   apiClient,
 		stateStore:  stateStore,
 		running:     false,
 	}
 
-	// Create alert processor with handler callback
-	b.processor = NewAlertProcessor(api, config.Name, b.handleAlert)
+	// Create alert processor with poster and channel ID
+	b.processor = NewAlertProcessor(api, config.Name, poster, config.ChannelID)
 
 	// Create poller
 	pollInterval := time.Duration(config.PollIntervalSeconds) * time.Second
@@ -213,21 +215,4 @@ func (b *Backend) GetStatus() backend.Status {
 	}
 
 	return status
-}
-
-// handleAlert is the callback invoked by the processor for each new alert
-// This is a placeholder implementation that logs the alert
-// In Phase 12, this will be replaced with actual Mattermost posting logic
-func (b *Backend) handleAlert(alert *backend.Alert) error {
-	b.api.Log.Debug("Received alert (placeholder handler)",
-		"alertId", alert.AlertID,
-		"backendName", alert.BackendName,
-		"headline", alert.Headline,
-		"alertType", alert.AlertType,
-		"eventTime", alert.EventTime)
-
-	// TODO Phase 12: Replace with actual Mattermost poster implementation
-	// For now, just log that we received the alert
-
-	return nil
 }

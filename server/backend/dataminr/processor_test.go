@@ -18,16 +18,18 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 
 	t.Run("processes new alerts successfully", func(t *testing.T) {
 		api := plugintest.NewAPI(t)
-		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything).Maybe()
+		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 		client := pluginapi.NewClient(api, &plugintest.Driver{})
 
-		handledAlerts := []*backend.Alert{}
-		handler := func(alert *backend.Alert) error {
-			handledAlerts = append(handledAlerts, alert)
-			return nil
+		postedAlerts := []backend.Alert{}
+		mockPoster := &MockPoster{
+			PostAlertFn: func(alert backend.Alert, channelID string) error {
+				postedAlerts = append(postedAlerts, alert)
+				return nil
+			},
 		}
 
-		processor := NewAlertProcessor(client, "Test Backend", handler)
+		processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
 		defer processor.Stop()
 
 		alerts := []Alert{
@@ -51,23 +53,25 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, 2, count)
-		assert.Len(t, handledAlerts, 2)
-		assert.Equal(t, "alert-1", handledAlerts[0].AlertID)
-		assert.Equal(t, "alert-2", handledAlerts[1].AlertID)
+		assert.Len(t, postedAlerts, 2)
+		assert.Equal(t, "alert-1", postedAlerts[0].AlertID)
+		assert.Equal(t, "alert-2", postedAlerts[1].AlertID)
 	})
 
 	t.Run("skips duplicate alerts", func(t *testing.T) {
 		api := plugintest.NewAPI(t)
-		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything).Maybe()
+		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 		client := pluginapi.NewClient(api, &plugintest.Driver{})
 
-		handledAlerts := []*backend.Alert{}
-		handler := func(alert *backend.Alert) error {
-			handledAlerts = append(handledAlerts, alert)
-			return nil
+		postedAlerts := []backend.Alert{}
+		mockPoster := &MockPoster{
+			PostAlertFn: func(alert backend.Alert, channelID string) error {
+				postedAlerts = append(postedAlerts, alert)
+				return nil
+			},
 		}
 
-		processor := NewAlertProcessor(client, "Test Backend", handler)
+		processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
 		defer processor.Stop()
 
 		alerts := []Alert{
@@ -91,21 +95,23 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, 1, count)
-		assert.Len(t, handledAlerts, 1)
+		assert.Len(t, postedAlerts, 1)
 	})
 
 	t.Run("skips duplicates across batches", func(t *testing.T) {
 		api := plugintest.NewAPI(t)
-		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything).Maybe()
+		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 		client := pluginapi.NewClient(api, &plugintest.Driver{})
 
-		handledAlerts := []*backend.Alert{}
-		handler := func(alert *backend.Alert) error {
-			handledAlerts = append(handledAlerts, alert)
-			return nil
+		postedAlerts := []backend.Alert{}
+		mockPoster := &MockPoster{
+			PostAlertFn: func(alert backend.Alert, channelID string) error {
+				postedAlerts = append(postedAlerts, alert)
+				return nil
+			},
 		}
 
-		processor := NewAlertProcessor(client, "Test Backend", handler)
+		processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
 		defer processor.Stop()
 
 		// First batch
@@ -145,29 +151,31 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 1, count2) // Only alert-2 should be processed
 
-		assert.Len(t, handledAlerts, 2)
-		assert.Equal(t, "alert-1", handledAlerts[0].AlertID)
-		assert.Equal(t, "alert-2", handledAlerts[1].AlertID)
+		assert.Len(t, postedAlerts, 2)
+		assert.Equal(t, "alert-1", postedAlerts[0].AlertID)
+		assert.Equal(t, "alert-2", postedAlerts[1].AlertID)
 	})
 
 	t.Run("continues processing on handler error", func(t *testing.T) {
 		api := plugintest.NewAPI(t)
-		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything).Maybe()
-		api.On("LogError", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+		api.On("LogError", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 		client := pluginapi.NewClient(api, &plugintest.Driver{})
 
-		handledAlerts := []*backend.Alert{}
+		postedAlerts := []backend.Alert{}
 		callCount := 0
-		handler := func(alert *backend.Alert) error {
-			callCount++
-			if alert.AlertID == "alert-2" {
-				return errors.New("handler error")
-			}
-			handledAlerts = append(handledAlerts, alert)
-			return nil
+		mockPoster := &MockPoster{
+			PostAlertFn: func(alert backend.Alert, channelID string) error {
+				callCount++
+				if alert.AlertID == "alert-2" {
+					return errors.New("handler error")
+				}
+				postedAlerts = append(postedAlerts, alert)
+				return nil
+			},
 		}
 
-		processor := NewAlertProcessor(client, "Test Backend", handler)
+		processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
 		defer processor.Stop()
 
 		alerts := []Alert{
@@ -198,7 +206,7 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, 2, count) // alert-1 and alert-3 succeeded
-		assert.Len(t, handledAlerts, 2)
+		assert.Len(t, postedAlerts, 2)
 		assert.Equal(t, 3, callCount) // Handler was called for all 3
 	})
 
@@ -206,28 +214,32 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 		api := plugintest.NewAPI(t)
 		client := pluginapi.NewClient(api, &plugintest.Driver{})
 
-		handledAlerts := []*backend.Alert{}
-		handler := func(alert *backend.Alert) error {
-			handledAlerts = append(handledAlerts, alert)
-			return nil
+		postedAlerts := []backend.Alert{}
+		mockPoster := &MockPoster{
+			PostAlertFn: func(alert backend.Alert, channelID string) error {
+				postedAlerts = append(postedAlerts, alert)
+				return nil
+			},
 		}
 
-		processor := NewAlertProcessor(client, "Test Backend", handler)
+		processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
 		defer processor.Stop()
 
 		count, err := processor.ProcessAlerts([]Alert{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, 0, count)
-		assert.Len(t, handledAlerts, 0)
+		assert.Len(t, postedAlerts, 0)
 	})
 
-	t.Run("nil handler is allowed", func(t *testing.T) {
+	t.Run("poster is called for each alert", func(t *testing.T) {
 		api := plugintest.NewAPI(t)
-		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything).Maybe()
+		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 		client := pluginapi.NewClient(api, &plugintest.Driver{})
 
-		processor := NewAlertProcessor(client, "Test Backend", nil)
+		mockPoster := &MockPoster{}
+
+		processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
 		defer processor.Stop()
 
 		alerts := []Alert{
@@ -248,16 +260,18 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 
 	t.Run("normalizes alerts correctly", func(t *testing.T) {
 		api := plugintest.NewAPI(t)
-		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything).Maybe()
+		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 		client := pluginapi.NewClient(api, &plugintest.Driver{})
 
-		var capturedAlert *backend.Alert
-		handler := func(alert *backend.Alert) error {
-			capturedAlert = alert
-			return nil
+		var capturedAlert backend.Alert
+		mockPoster := &MockPoster{
+			PostAlertFn: func(alert backend.Alert, channelID string) error {
+				capturedAlert = alert
+				return nil
+			},
 		}
 
-		processor := NewAlertProcessor(client, "Test Backend", handler)
+		processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
 		defer processor.Stop()
 
 		alerts := []Alert{
@@ -280,7 +294,6 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, 1, count)
-		assert.NotNil(t, capturedAlert)
 		assert.Equal(t, "Test Backend", capturedAlert.BackendName)
 		assert.Equal(t, "alert-1", capturedAlert.AlertID)
 		assert.Equal(t, "Flash", capturedAlert.AlertType)

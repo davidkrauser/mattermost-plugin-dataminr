@@ -10,8 +10,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// mockPoster is a simple poster implementation for testing
+type mockPoster struct{}
+
+func (m *mockPoster) PostAlert(alert Alert, channelID string) error {
+	return nil
+}
+
 // mockFactory creates a mock backend using the existing mockBackend from registry_test.go
-func mockFactory(config Config, api *pluginapi.Client, papi plugin.API) (Backend, error) {
+func mockFactory(config Config, api *pluginapi.Client, papi plugin.API, poster AlertPoster) (Backend, error) {
 	return newMockBackend(config.ID, config.Name, config.Type), nil
 }
 
@@ -71,7 +78,7 @@ func TestCreate(t *testing.T) {
 			Type: "mock",
 		}
 
-		backend, err := Create(config, client, api)
+		backend, err := Create(config, client, api, &mockPoster{})
 		require.NoError(t, err)
 		require.NotNil(t, backend)
 
@@ -89,7 +96,7 @@ func TestCreate(t *testing.T) {
 			Type: "unknown",
 		}
 
-		backend, err := Create(config, client, api)
+		backend, err := Create(config, client, api, &mockPoster{})
 		assert.Error(t, err)
 		assert.Nil(t, backend)
 		assert.Contains(t, err.Error(), "unknown backend type: unknown")
@@ -104,7 +111,7 @@ func TestCreate(t *testing.T) {
 			Type: "",
 		}
 
-		backend, err := Create(config, client, api)
+		backend, err := Create(config, client, api, &mockPoster{})
 		assert.Error(t, err)
 		assert.Nil(t, backend)
 		assert.Contains(t, err.Error(), "backend type is required")

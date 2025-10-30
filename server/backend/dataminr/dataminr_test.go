@@ -163,7 +163,7 @@ func TestNew(t *testing.T) {
 			mockAPI := &plugintest.API{}
 			client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
 
-			b, err := New(tt.config, client, mockAPI)
+			b, err := New(tt.config, client, mockAPI, &MockPoster{})
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -202,7 +202,7 @@ func TestDataminrBackend_Getters(t *testing.T) {
 	mockAPI := &plugintest.API{}
 	client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
 
-	b, err := New(config, client, mockAPI)
+	b, err := New(config, client, mockAPI, &MockPoster{})
 	require.NoError(t, err)
 
 	assert.Equal(t, "backend-123", b.GetID())
@@ -254,7 +254,7 @@ func TestDataminrBackend_Start(t *testing.T) {
 			mockAPI.On("LogInfo", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 			client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
 
-			b, err := New(config, client, mockAPI)
+			b, err := New(config, client, mockAPI, &MockPoster{})
 			require.NoError(t, err)
 
 			// Inject mock scheduler
@@ -304,7 +304,7 @@ func TestDataminrBackend_StartAlreadyRunning(t *testing.T) {
 	mockAPI := &plugintest.API{}
 	client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
 
-	b, err := New(config, client, mockAPI)
+	b, err := New(config, client, mockAPI, &MockPoster{})
 	require.NoError(t, err)
 
 	// Manually set running to true
@@ -334,7 +334,7 @@ func TestDataminrBackend_Stop(t *testing.T) {
 		mockAPI := &plugintest.API{}
 		client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
 
-		b, err := New(config, client, mockAPI)
+		b, err := New(config, client, mockAPI, &MockPoster{})
 		require.NoError(t, err)
 
 		err = b.Stop()
@@ -347,7 +347,7 @@ func TestDataminrBackend_Stop(t *testing.T) {
 		mockAPI.On("LogInfo", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 		client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
 
-		b, err := New(config, client, mockAPI)
+		b, err := New(config, client, mockAPI, &MockPoster{})
 		require.NoError(t, err)
 
 		// Set up mock job
@@ -394,7 +394,7 @@ func TestDataminrBackend_GetStatus(t *testing.T) {
 
 		client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
 
-		b, err := New(config, client, mockAPI)
+		b, err := New(config, client, mockAPI, &MockPoster{})
 		require.NoError(t, err)
 
 		status := b.GetStatus()
@@ -425,7 +425,7 @@ func TestDataminrBackend_GetStatus(t *testing.T) {
 
 		client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
 
-		b, err := New(config, client, mockAPI)
+		b, err := New(config, client, mockAPI, &MockPoster{})
 		require.NoError(t, err)
 
 		// Set backend as running
@@ -458,7 +458,7 @@ func TestDataminrBackend_GetStatus(t *testing.T) {
 
 		client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
 
-		b, err := New(config, client, mockAPI)
+		b, err := New(config, client, mockAPI, &MockPoster{})
 		require.NoError(t, err)
 
 		status := b.GetStatus()
@@ -467,42 +467,6 @@ func TestDataminrBackend_GetStatus(t *testing.T) {
 
 		mockAPI.AssertExpectations(t)
 	})
-}
-
-func TestDataminrBackend_HandleAlert(t *testing.T) {
-	config := backend.Config{
-		ID:                  "test-backend",
-		Name:                "Test Backend",
-		Type:                "dataminr",
-		Enabled:             true,
-		URL:                 "https://api.dataminr.com",
-		APIId:               "test-id",
-		APIKey:              "test-key",
-		ChannelID:           "channel123",
-		PollIntervalSeconds: 30,
-	}
-
-	mockAPI := &plugintest.API{}
-	mockAPI.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
-
-	client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
-
-	b, err := New(config, client, mockAPI)
-	require.NoError(t, err)
-
-	alert := &backend.Alert{
-		AlertID:     "alert-123",
-		BackendName: "Test Backend",
-		Headline:    "Test Alert",
-		AlertType:   "urgent",
-		EventTime:   time.Now(),
-	}
-
-	// Call the placeholder handler
-	err = b.handleAlert(alert)
-	assert.NoError(t, err)
-
-	mockAPI.AssertExpectations(t)
 }
 
 // Helper functions for marshaling test data

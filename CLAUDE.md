@@ -67,8 +67,11 @@ Each backend instance is self-contained and manages:
 - **API Client**: HTTP client for backend-specific API calls
 - **Poller**: Cluster-aware scheduled job that runs every 30 seconds (uses Mattermost's cluster plugin scheduled job system to ensure only one instance polls in multi-server deployments)
 - **State Storage**: Per-backend KV store keys (auth token, cursor, error count)
-- **Alert Processor**: Normalizes and deduplicates alerts
-- **Error Handler**: Tracks failures, implements retry logic, isolates errors
+- **Alert Processor**: Orchestrates normalization, deduplication, and alert handling
+  - Uses pure adapter functions for normalization
+  - Maintains in-memory deduplication cache with automatic cleanup
+  - Invokes alert handler callback for posting to Mattermost
+- **Error Tracking**: Tracks failures in state storage, implements retry logic at poll cycle intervals, isolates errors per backend
 
 #### Alert Formatter
 - Backend-agnostic formatting layer
@@ -292,10 +295,10 @@ All backend types must implement a common interface. Key responsibilities:
 - Provide unique identifier, name, and type
 - Return current health status
 
-The interface will work with three main structures:
+The interface works with three main structures:
 - **Config**: ID, Name, Type, Enabled, URL, credentials, ChannelID, PollIntervalSeconds
 - **Status**: Enabled, poll times, failure count, authentication state, last error
-- **Alert**: Normalized alert data with backend name, alert metadata, location, and raw JSON
+- **Alert**: Normalized alert data with backend name, alert metadata (topics, lists, linked alerts), location, source text, translated text, and media URLs
 
 ### 4.4 Backend Registry
 
@@ -348,9 +351,22 @@ server/backend/dataminr/
 ├── auth.go           # Authentication manager
 ├── client.go         # API client
 ├── poller.go         # Polling job
-├── processor.go      # Alert normalization
+├── adapter.go        # Alert normalization (pure functions)
+├── deduplicator.go   # Deduplication cache
+├── processor.go      # Alert processing orchestrator
 ├── state.go          # KV state storage
 └── types.go          # Dataminr-specific types
+```
+
+**Backend Core Files:**
+```
+server/backend/
+├── constants.go      # Application constants (MaxConsecutiveFailures, etc.)
+├── interface.go      # Backend interface definition
+├── backend.go        # Config and Status structs
+├── alert.go          # Normalized Alert and Location structs
+├── registry.go       # Thread-safe backend registry
+└── validator.go      # Configuration validation
 ```
 
 ### 5.2 Key Implementation Requirements
@@ -379,12 +395,19 @@ server/backend/dataminr/
 - Graceful shutdown by canceling scheduled jobs
 - Each backend registers its own unique job with a backend-specific job ID
 
-**Alert Processor (`processor.go`):**
-- Normalize RawAlert to backend.Alert
-- Parse location data from `estimatedEventLocation` array
-- Convert event time from milliseconds to time.Time
-- Store metadata (topics, alert lists, linked alerts, sub-headline, media)
-- In-memory deduplication cache (24-hour cleanup)
+**Alert Processing (`adapter.go`, `deduplicator.go`, `processor.go`):**
+- **Adapter** (`adapter.go`): Pure functions to normalize Dataminr alerts to backend.Alert
+  - Extracts metadata (topics, alert lists, linked alerts, sub-headline, media)
+  - Converts miles to meters for location confidence radius
+  - Formats sub-headlines with markdown
+- **Deduplicator** (`deduplicator.go`): In-memory deduplication cache
+  - Tracks seen alert IDs with timestamps
+  - Cleanup runs every 10 minutes, removes entries older than 1 hour
+  - Thread-safe with RWMutex for concurrent access
+- **Processor** (`processor.go`): Orchestrates normalization, deduplication, and alert handling
+  - Processes alert batches from API client
+  - Skips duplicates and continues on handler errors
+  - Calls alert handler callback for each new alert
 
 **State Storage (`state.go`):**
 - KV store keys: `backend_{id}_cursor`, `backend_{id}_last_poll`, `backend_{id}_failures`, `backend_{id}_auth`
@@ -430,10 +453,10 @@ server/backend/dataminr/
 
 ### 7.1 Error Isolation
 
-- Each backend manages errors independently with `ErrorHandler`
-- Track consecutive failures, last error, and error time
+- Each backend manages errors independently via state storage
+- Track consecutive failures, last error, and error time in KV store
 - Reset counter on successful poll
-- Disable backend when failures reach max threshold
+- Disable backend when failures reach `MaxConsecutiveFailures` (5) threshold
 
 ### 7.2 Error Types and Responses
 

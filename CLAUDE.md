@@ -607,7 +607,7 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 | 4 | ✅ Complete | Dataminr Authentication |
 | 5 | ✅ Complete | Dataminr API Client |
 | 6 | ✅ Complete | Dataminr Alert Processor |
-| 7 | ⬜ Not Started | Dataminr Poller |
+| 7 | ✅ Complete | Dataminr Poller |
 | 8 | ⬜ Not Started | Dataminr Backend Main |
 | 9 | ⬜ Not Started | Backend Manager & Plugin Integration |
 | 10 | ⬜ Not Started | Backend Status API |
@@ -737,22 +737,18 @@ Implemented alert processing with three focused components:
 
 ---
 
-### Phase 7: Dataminr Poller ⬜
+### Phase 7: Dataminr Poller ✅
 
-**Goal**: Implement cluster-aware polling job.
+**Status**: Complete
+**Commits**: e822da4
 
-**Steps**:
-- Create `server/backend/dataminr/poller.go` with Poller
-- Use Mattermost's cluster scheduled job system
-- Implement poll cycle with cursor tracking and error handling
-- Write unit tests and integration tests
-
-**Completion Criteria**:
-- Poller functional with cluster awareness
-- Error handling and auto-disable working
-- Integration test validates full flow
-- All tests passing
-- Lint checks passing
+Implemented cluster-aware poller with:
+- Poller component using Mattermost's cluster job system for HA deployments
+- AlertFetcher interface for testing with mocks
+- Poll cycle: load cursor → fetch alerts → process → save cursor → reset failures
+- Error handling with automatic backend disable after MaxConsecutiveFailures (5)
+- Comprehensive unit tests covering success, failures, and auto-disable threshold
+- All tests and lint checks passing
 
 ---
 

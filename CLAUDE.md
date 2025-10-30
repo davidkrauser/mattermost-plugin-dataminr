@@ -614,7 +614,12 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 | 10 | ✅ Complete | Backend Status API |
 | 11 | ✅ Complete | Alert Formatter |
 | 12 | ✅ Complete | Mattermost Poster |
-| 13 | ⬜ Not Started | Webapp Admin Console Component |
+| 13 | ⬜ Not Started | Webapp Foundation & Types |
+| 14 | ⬜ Not Started | Backend List & Card UI |
+| 15 | ⬜ Not Started | Status Integration & Indicators |
+| 16 | ⬜ Not Started | Backend Form Fields |
+| 17 | ⬜ Not Started | CRUD Operations |
+| 18 | ⬜ Not Started | Persistence, Validation & Polish |
 
 ---
 
@@ -833,25 +838,110 @@ Implemented Mattermost poster with:
 
 ---
 
-### Phase 13: Webapp Admin Console Component ⬜
+### Phase 13: Webapp Foundation & Types ⬜
 
-**Goal**: Implement React component for backend configuration.
+**Goal**: Establish project structure, type definitions, and component registration.
 
-**Steps**:
-- Create component structure: `backend_settings.tsx`, `backend_form.tsx`, `backend_list.tsx`
-- Create TypeScript types in `backends.ts`
-- Implement CRUD operations, validation, and status polling
-- Register component in `webapp/src/index.tsx`
-- Update `plugin.json` with Backends setting definition
-- Write component tests
+**Work**:
+- Create directory structure: `webapp/src/components/admin_console/backend_settings/`
+- Create TypeScript types file (`types.ts`): `BackendConfig`, `BackendStatus`, `BackendType`, status indicator enums
+- Update `plugin.json` to add `Backends` custom setting definition
+- Register custom setting in `webapp/src/index.tsx` using `registerAdminConsoleCustomSetting()`
+- Create empty `BackendSettings.tsx` component shell that receives props and renders placeholder
+- Write tests for type utilities and basic component rendering
 
-**Completion Criteria**:
-- Admin console component functional
-- CRUD operations working
-- Status display real-time
-- All validation working
-- All tests passing
-- Lint checks passing
+**Completion Criteria**: Component appears in System Console (empty state), types are defined, builds successfully, all tests and lint checks passing
+
+---
+
+### Phase 14: Backend List & Card UI ⬜
+
+**Goal**: Implement backend list display with collapsible card pattern.
+
+**Work**:
+- Create `BackendList.tsx` component rendering array of backends
+- Create `BackendCard.tsx` with collapsible card pattern (header + expand/collapse)
+- Card header shows: icon, backend name, type, enabled badge
+- Expand/collapse with chevron icon (similar to agents plugin bot cards)
+- Render "No backends configured" empty state
+- Pass backend data from props through to cards
+- Write component tests for list rendering, expand/collapse behavior
+
+**Completion Criteria**: Can view list of backends in collapsible cards, no status or editing yet, all tests and lint checks passing
+
+---
+
+### Phase 15: Status Integration & Indicators ⬜
+
+**Goal**: Integrate real-time status polling and display health indicators.
+
+**Work**:
+- Create status polling service/hook that calls `/api/v1/backends/status` every 10 seconds
+- Merge status data with config data by matching backend UUIDs
+- Add status indicators to card headers: ✅ Active (0 failures), ⚠️ Warning (1-4 failures), ❌ Disabled (5+ failures), ❓ Unknown (no status)
+- Display in expanded card: last poll time, last success time, consecutive failures, auth status, last error message
+- Handle loading and error states for status API calls
+- Write tests for status polling, merging logic, and indicator display
+
+**Completion Criteria**: Real-time status visible for each backend, visual indicators working, all tests and lint checks passing
+
+---
+
+### Phase 16: Backend Form Fields ⬜
+
+**Goal**: Implement form for viewing/editing backend configuration.
+
+**Work**:
+- Create `BackendForm.tsx` component (rendered inline in expanded card)
+- Implement all form fields:
+  - Name (text input)
+  - Type (dropdown, hardcoded "dataminr" option for now)
+  - Enabled (toggle switch)
+  - URL (text input)
+  - API ID (text input)
+  - API Key (password input)
+  - Channel ID (text input, no autocomplete)
+  - Poll Interval Seconds (number input, min: 10)
+- Basic field validation (non-empty fields only, backend handles detailed validation)
+- Use `crypto.randomUUID()` for generating IDs for new backends
+- Write tests for form rendering, validation, and field interactions
+
+**Completion Criteria**: Form displays all fields, basic validation works, can view/edit backend details (no save yet), all tests and lint checks passing
+
+---
+
+### Phase 17: CRUD Operations ⬜
+
+**Goal**: Implement add, edit, and delete operations with local state management.
+
+**Work**:
+- Add "Add Backend" button that creates new backend with UUID and default values
+- Implement edit flow: changes update local state
+- Implement delete with confirmation dialog (reuse agents plugin pattern)
+- Manage form state within component
+- Propagate changes via `onChange(id, value)` prop
+- Write tests for add, edit, delete operations and state management
+
+**Completion Criteria**: Can add/edit/delete backends, changes reflected in UI (not persisted yet), all tests and lint checks passing
+
+---
+
+### Phase 18: Persistence, Validation & Polish ⬜
+
+**Goal**: Complete integration with Mattermost config system and production polish.
+
+**Work**:
+- Integrate with Mattermost `updateConfig()` Redux action for persistence
+- Call `setSaveNeeded()` prop when changes occur
+- Implement `registerSaveAction` / `unRegisterSaveAction` for custom save logic if needed
+- Add loading/saving indicators
+- Error handling for save failures
+- Accessibility improvements (ARIA labels, keyboard navigation)
+- Polish UX (transitions, error messages, disabled states)
+- Write integration tests for full add→edit→save→delete flow
+- Test error scenarios
+
+**Completion Criteria**: Full CRUD workflow persists to server, production-ready, all tests and lint checks passing
 
 ---
 

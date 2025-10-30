@@ -347,7 +347,7 @@ A central registry (implemented in `server/backend/registry.go`) manages all bac
 
 ```
 server/backend/dataminr/
-├── dataminr.go       # Main backend implementation
+├── dataminr.go       # Main backend implementation (dataminr.Backend type)
 ├── auth.go           # Authentication manager
 ├── client.go         # API client
 ├── poller.go         # Polling job
@@ -355,6 +355,7 @@ server/backend/dataminr/
 ├── deduplicator.go   # Deduplication cache
 ├── processor.go      # Alert processing orchestrator
 ├── state.go          # KV state storage
+├── scheduler.go      # Job scheduler interface
 └── types.go          # Dataminr-specific types
 ```
 
@@ -608,7 +609,7 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 | 5 | ✅ Complete | Dataminr API Client |
 | 6 | ✅ Complete | Dataminr Alert Processor |
 | 7 | ✅ Complete | Dataminr Poller |
-| 8 | ⬜ Not Started | Dataminr Backend Main |
+| 8 | ✅ Complete | Dataminr Backend Main |
 | 9 | ⬜ Not Started | Backend Manager & Plugin Integration |
 | 10 | ⬜ Not Started | Backend Status API |
 | 11 | ⬜ Not Started | Alert Formatter |
@@ -752,22 +753,21 @@ Implemented cluster-aware poller with:
 
 ---
 
-### Phase 8: Dataminr Backend Main ⬜
+### Phase 8: Dataminr Backend Main ✅
 
-**Goal**: Implement main Dataminr backend struct.
+**Status**: Complete
+**Commits**: d595fd8, d2d7341, d282fc7
 
-**Steps**:
-- Create `server/backend/dataminr/dataminr.go` implementing Backend interface
-- Wire together all Dataminr components
-- Implement alert callback for posting to Mattermost (placeholder)
-- Write unit tests and integration tests
+Implemented main Dataminr backend with:
+- `dataminr.Backend` struct implementing `backend.Backend` interface
+- `dataminr.New()` constructor wiring all components together
+- Placeholder `handleAlert()` callback (to be replaced in Phase 12)
+- Job scheduler interface for testability (`scheduler.go`)
+- Comprehensive unit tests with mocked job scheduler
+- Integration tests exercising full flow including authentication, polling, and error handling
+- All tests and lint checks passing
 
-**Completion Criteria**:
-- Dataminr backend fully functional
-- All interface methods implemented
-- Integration test validates full backend
-- All tests passing
-- Lint checks passing
+**Note on Naming**: The type is named `Backend` (not `DataminrBackend`) following Go conventions - when imported it reads as `dataminr.Backend` which is clear and idiomatic.
 
 ---
 

@@ -51,7 +51,7 @@ func TestRegisterBackendFactory(t *testing.T) {
 	})
 }
 
-func TestCreateBackend(t *testing.T) {
+func TestCreate(t *testing.T) {
 	// Save original registry and restore after test
 	originalRegistry := factoryRegistry
 	defer func() { factoryRegistry = originalRegistry }()
@@ -71,7 +71,7 @@ func TestCreateBackend(t *testing.T) {
 			Type: "mock",
 		}
 
-		backend, err := CreateBackend(config, client, api)
+		backend, err := Create(config, client, api)
 		require.NoError(t, err)
 		require.NotNil(t, backend)
 
@@ -89,7 +89,7 @@ func TestCreateBackend(t *testing.T) {
 			Type: "unknown",
 		}
 
-		backend, err := CreateBackend(config, client, api)
+		backend, err := Create(config, client, api)
 		assert.Error(t, err)
 		assert.Nil(t, backend)
 		assert.Contains(t, err.Error(), "unknown backend type: unknown")
@@ -104,7 +104,7 @@ func TestCreateBackend(t *testing.T) {
 			Type: "",
 		}
 
-		backend, err := CreateBackend(config, client, api)
+		backend, err := Create(config, client, api)
 		assert.Error(t, err)
 		assert.Nil(t, backend)
 		assert.Contains(t, err.Error(), "backend type is required")

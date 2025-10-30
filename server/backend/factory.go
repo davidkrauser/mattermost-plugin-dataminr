@@ -19,9 +19,9 @@ func RegisterBackendFactory(backendType string, factory Factory) {
 	factoryRegistry[backendType] = factory
 }
 
-// CreateBackend creates a new backend instance based on the provided configuration.
+// Create creates a new backend instance based on the provided configuration.
 // Returns an error if the backend type is unknown or if creation fails.
-func CreateBackend(config Config, api *pluginapi.Client, papi plugin.API) (Backend, error) {
+func Create(config Config, api *pluginapi.Client, papi plugin.API) (Backend, error) {
 	if config.Type == "" {
 		return nil, fmt.Errorf("backend type is required")
 	}

@@ -131,26 +131,18 @@ func (p *Plugin) OnConfigurationChange() error {
 			unregisterBackend(p.registry, p.API, id, "backend removed from configuration")
 		}
 
-		// Update modified backends (unregister old backend, creation deferred to Phase 9)
+		// Update modified backends (stop old, start new)
 		for _, id := range toUpdate {
 			unregisterBackend(p.registry, p.API, id, "backend configuration changed")
 			if cfg, found := findBackendConfigByID(newConfig.Backends, id); found {
-				// TODO (Phase 9): Create and register updated backend
-				p.API.LogInfo("Backend update pending backend creation",
-					"id", cfg.ID,
-					"name", cfg.Name,
-					"type", cfg.Type)
+				p.createAndStartBackend(cfg)
 			}
 		}
 
-		// Add new backends (creation deferred to Phase 9)
+		// Add new backends
 		for _, id := range toAdd {
 			if cfg, found := findBackendConfigByID(newConfig.Backends, id); found {
-				// TODO (Phase 9): Create and register new backend
-				p.API.LogInfo("New backend pending creation",
-					"id", cfg.ID,
-					"name", cfg.Name,
-					"type", cfg.Type)
+				p.createAndStartBackend(cfg)
 			}
 		}
 	}

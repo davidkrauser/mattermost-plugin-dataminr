@@ -2,7 +2,10 @@
 // See LICENSE.txt for license information.
 
 import Enzyme from 'enzyme';
-import Adapter from 'enzyme-adapter-react-17-updated';
+import * as AdapterModule from 'enzyme-adapter-react-17-updated';
+
+// @ts-expect-error - enzyme-adapter-react-17-updated doesn't have proper TypeScript types
+const Adapter = AdapterModule.default || AdapterModule;
 
 Enzyme.configure({adapter: new Adapter()});
 

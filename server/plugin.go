@@ -40,6 +40,13 @@ func (p *Plugin) OnActivate() error {
 	p.client = pluginapi.NewClient(p.API, p.Driver)
 	p.registry = backend.NewRegistry()
 
+	// Check license
+	if !pluginapi.IsEnterpriseLicensedOrDevelopment(p.API.GetConfig(), p.API.GetLicense()) {
+		err := errors.New("this plugin requires an Enterprise license")
+		p.API.LogError("Cannot initialize plugin", "err", err)
+		return err
+	}
+
 	// Get configuration
 	config := p.getConfiguration()
 

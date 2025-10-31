@@ -8,11 +8,12 @@ import {ChevronDownIcon, ChevronUpIcon} from '@mattermost/compass-icons/componen
 
 import BackendCard from './BackendCard';
 import {ButtonIcon} from './buttons';
-import {GrayPill} from './pill';
-import type {BackendConfig} from './types';
+import {GrayPill, SuccessPill, WarningPill, DangerPill} from './pill';
+import type {BackendDisplay} from './types';
+import {StatusIndicator} from './types';
 
 describe('BackendCard', () => {
-    const mockBackend: BackendConfig = {
+    const mockBackend: BackendDisplay = {
         id: '550e8400-e29b-41d4-a716-446655440000',
         name: 'Test Backend',
         type: 'dataminr',
@@ -22,6 +23,7 @@ describe('BackendCard', () => {
         apiKey: 'test-api-key',
         channelId: 'test-channel-id',
         pollIntervalSeconds: 30,
+        statusIndicator: StatusIndicator.Unknown,
     };
 
     const mockOnChange = jest.fn();
@@ -57,7 +59,52 @@ describe('BackendCard', () => {
         expect(wrapper.text()).toContain('(Unnamed Backend)');
     });
 
-    it('should show ENABLED pill when backend is enabled', () => {
+    it('should show ACTIVE pill for active status', () => {
+        const activeBackend = {...mockBackend, statusIndicator: StatusIndicator.Active};
+        const wrapper = shallow(
+            <BackendCard
+                backend={activeBackend}
+                onChange={mockOnChange}
+                onDelete={mockOnDelete}
+            />,
+        );
+
+        const pills = wrapper.find(SuccessPill);
+        expect(pills).toHaveLength(1);
+        expect(pills.at(0).children().text()).toBe('ACTIVE');
+    });
+
+    it('should show WARNING pill for warning status', () => {
+        const warningBackend = {...mockBackend, statusIndicator: StatusIndicator.Warning};
+        const wrapper = shallow(
+            <BackendCard
+                backend={warningBackend}
+                onChange={mockOnChange}
+                onDelete={mockOnDelete}
+            />,
+        );
+
+        const pills = wrapper.find(WarningPill);
+        expect(pills).toHaveLength(1);
+        expect(pills.at(0).children().text()).toBe('WARNING');
+    });
+
+    it('should show DISABLED pill for disabled status', () => {
+        const disabledBackend = {...mockBackend, statusIndicator: StatusIndicator.Disabled};
+        const wrapper = shallow(
+            <BackendCard
+                backend={disabledBackend}
+                onChange={mockOnChange}
+                onDelete={mockOnDelete}
+            />,
+        );
+
+        const pills = wrapper.find(DangerPill);
+        expect(pills).toHaveLength(1);
+        expect(pills.at(0).children().text()).toBe('DISABLED');
+    });
+
+    it('should show UNKNOWN pill for unknown status', () => {
         const wrapper = shallow(
             <BackendCard
                 backend={mockBackend}
@@ -68,22 +115,7 @@ describe('BackendCard', () => {
 
         const pills = wrapper.find(GrayPill);
         expect(pills).toHaveLength(1);
-        expect(pills.at(0).children().text()).toBe('ENABLED');
-    });
-
-    it('should show DISABLED pill when backend is disabled', () => {
-        const disabledBackend = {...mockBackend, enabled: false};
-        const wrapper = shallow(
-            <BackendCard
-                backend={disabledBackend}
-                onChange={mockOnChange}
-                onDelete={mockOnDelete}
-            />,
-        );
-
-        const pills = wrapper.find(GrayPill);
-        expect(pills).toHaveLength(1);
-        expect(pills.at(0).children().text()).toBe('DISABLED');
+        expect(pills.at(0).children().text()).toBe('UNKNOWN');
     });
 
     it('should be collapsed by default', () => {
@@ -179,5 +211,91 @@ describe('BackendCard', () => {
         expect(text).toContain('test-channel-id');
         expect(text).toContain('30s');
         expect(text).toContain('Yes');
+    });
+
+    it('should display status details when status is available', () => {
+        const backendWithStatus: BackendDisplay = {
+            ...mockBackend,
+            statusIndicator: StatusIndicator.Active,
+            status: {
+                enabled: true,
+                lastPollTime: '2025-10-31T12:00:00Z',
+                lastSuccessTime: '2025-10-31T12:00:00Z',
+                consecutiveFailures: 0,
+                isAuthenticated: true,
+                lastError: '',
+            },
+        };
+
+        const wrapper = shallow(
+            <BackendCard
+                backend={backendWithStatus}
+                onChange={mockOnChange}
+                onDelete={mockOnDelete}
+            />,
+        );
+
+        // Expand card
+        const header = wrapper.childAt(0);
+        header.simulate('click');
+
+        const text = wrapper.text();
+        expect(text).toContain('Status');
+        expect(text).toContain('Consecutive Failures:');
+        expect(text).toContain('0');
+        expect(text).toContain('Authenticated:');
+        expect(text).toContain('Yes');
+        expect(text).toContain('Last Poll:');
+        expect(text).toContain('Last Success:');
+    });
+
+    it('should display last error when present', () => {
+        const backendWithError: BackendDisplay = {
+            ...mockBackend,
+            statusIndicator: StatusIndicator.Disabled,
+            status: {
+                enabled: false,
+                lastPollTime: '2025-10-31T12:00:00Z',
+                lastSuccessTime: '2025-10-31T11:55:00Z',
+                consecutiveFailures: 5,
+                isAuthenticated: false,
+                lastError: 'Authentication failed: invalid credentials',
+            },
+        };
+
+        const wrapper = shallow(
+            <BackendCard
+                backend={backendWithError}
+                onChange={mockOnChange}
+                onDelete={mockOnDelete}
+            />,
+        );
+
+        // Expand card
+        const header = wrapper.childAt(0);
+        header.simulate('click');
+
+        const text = wrapper.text();
+        expect(text).toContain('Last Error:');
+        expect(text).toContain('Authentication failed: invalid credentials');
+    });
+
+    it('should not display status section when status is unavailable', () => {
+        const wrapper = shallow(
+            <BackendCard
+                backend={mockBackend}
+                onChange={mockOnChange}
+                onDelete={mockOnDelete}
+            />,
+        );
+
+        // Expand card
+        const header = wrapper.childAt(0);
+        header.simulate('click');
+
+        const text = wrapper.text();
+        expect(text).toContain('Configuration');
+        expect(text).not.toContain('Consecutive Failures:');
+        expect(text).not.toContain('Authenticated:');
     });
 });

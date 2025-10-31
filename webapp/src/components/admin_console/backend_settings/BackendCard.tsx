@@ -7,13 +7,27 @@ import styled from 'styled-components';
 import {TrashCanOutlineIcon, ChevronDownIcon, ChevronUpIcon, AlertOutlineIcon} from '@mattermost/compass-icons/components';
 
 import {ButtonIcon} from './buttons';
-import {GrayPill} from './pill';
-import type {BackendConfig} from './types';
+import {GrayPill, SuccessPill, WarningPill, DangerPill} from './pill';
+import type {BackendConfig, BackendDisplay, StatusIndicator} from './types';
 
 type Props = {
-    backend: BackendConfig;
+    backend: BackendDisplay;
     onChange: (backend: BackendConfig) => void;
     onDelete: () => void;
+};
+
+const StatusPill = ({indicator}: {indicator: StatusIndicator}) => {
+    switch (indicator) {
+    case 'active':
+        return <SuccessPill>{'ACTIVE'}</SuccessPill>;
+    case 'warning':
+        return <WarningPill>{'WARNING'}</WarningPill>;
+    case 'disabled':
+        return <DangerPill>{'DISABLED'}</DangerPill>;
+    case 'unknown':
+    default:
+        return <GrayPill>{'UNKNOWN'}</GrayPill>;
+    }
 };
 
 const BackendCard = (props: Props) => {
@@ -33,16 +47,7 @@ const BackendCard = (props: Props) => {
                     </TypeText>
                 </Title>
                 <Spacer/>
-                {props.backend.enabled && (
-                    <GrayPill>
-                        {'ENABLED'}
-                    </GrayPill>
-                )}
-                {!props.backend.enabled && (
-                    <GrayPill>
-                        {'DISABLED'}
-                    </GrayPill>
-                )}
+                <StatusPill indicator={props.backend.statusIndicator}/>
                 <ButtonIcon
                     onClick={(e) => {
                         e.stopPropagation();
@@ -58,6 +63,7 @@ const BackendCard = (props: Props) => {
                     <PlaceholderText>
                         {'Backend configuration form will be implemented in Phase 16'}
                     </PlaceholderText>
+                    <SectionTitle>{'Configuration'}</SectionTitle>
                     <InfoList>
                         <InfoItem><strong>{'ID:'}</strong> {props.backend.id}</InfoItem>
                         <InfoItem><strong>{'Name:'}</strong> {props.backend.name}</InfoItem>
@@ -67,6 +73,36 @@ const BackendCard = (props: Props) => {
                         <InfoItem><strong>{'Poll Interval:'}</strong> {props.backend.pollIntervalSeconds}{'s'}</InfoItem>
                         <InfoItem><strong>{'Enabled:'}</strong> {props.backend.enabled ? 'Yes' : 'No'}</InfoItem>
                     </InfoList>
+
+                    {props.backend.status && (
+                        <>
+                            <SectionTitle>{'Status'}</SectionTitle>
+                            <InfoList>
+                                <InfoItem>
+                                    <strong>{'Consecutive Failures:'}</strong> {props.backend.status.consecutiveFailures}
+                                </InfoItem>
+                                <InfoItem>
+                                    <strong>{'Authenticated:'}</strong> {props.backend.status.isAuthenticated ? 'Yes' : 'No'}
+                                </InfoItem>
+                                {props.backend.status.lastPollTime && (
+                                    <InfoItem>
+                                        <strong>{'Last Poll:'}</strong> {new Date(props.backend.status.lastPollTime).toLocaleString()}
+                                    </InfoItem>
+                                )}
+                                {props.backend.status.lastSuccessTime && (
+                                    <InfoItem>
+                                        <strong>{'Last Success:'}</strong> {new Date(props.backend.status.lastSuccessTime).toLocaleString()}
+                                    </InfoItem>
+                                )}
+                                {props.backend.status.lastError && (
+                                    <InfoItem>
+                                        <ErrorLabel>{'Last Error:'}</ErrorLabel>
+                                        <ErrorText>{props.backend.status.lastError}</ErrorText>
+                                    </InfoItem>
+                                )}
+                            </InfoList>
+                        </>
+                    )}
                 </ContentContainer>
             )}
         </BackendContainer>
@@ -94,6 +130,11 @@ const HeaderContainer = styled.div`
     padding: 12px 16px 12px 20px;
     border-bottom: 1px solid rgba(var(--center-channel-color-rgb), 0.12);
     cursor: pointer;
+    background-color: rgba(var(--center-channel-color-rgb), 0.02);
+
+    &:hover {
+        background-color: rgba(var(--center-channel-color-rgb), 0.04);
+    }
 `;
 
 const StyledAlertIcon = styled(AlertOutlineIcon)`
@@ -156,6 +197,23 @@ const InfoList = styled.div`
 const InfoItem = styled.div`
     font-size: 13px;
     line-height: 20px;
+`;
+
+const SectionTitle = styled.div`
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 16px;
+    margin-bottom: 12px;
+    color: rgba(var(--center-channel-color-rgb), 0.72);
+`;
+
+const ErrorLabel = styled.strong`
+    color: var(--error-text);
+`;
+
+const ErrorText = styled.span`
+    color: var(--error-text);
+    word-break: break-word;
 `;
 
 export default BackendCard;

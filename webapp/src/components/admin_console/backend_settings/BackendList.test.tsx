@@ -7,7 +7,8 @@ import React from 'react';
 import BackendCard from './BackendCard';
 import BackendList from './BackendList';
 import {TertiaryButton} from './buttons';
-import type {BackendConfig} from './types';
+import type {BackendConfig, BackendStatus} from './types';
+import {StatusIndicator} from './types';
 
 // Mock crypto.randomUUID
 const mockUUID = '550e8400-e29b-41d4-a716-446655440000';
@@ -42,6 +43,24 @@ describe('BackendList', () => {
         pollIntervalSeconds: 60,
     };
 
+    const mockStatus1: BackendStatus = {
+        enabled: true,
+        lastPollTime: '2025-10-31T12:00:00Z',
+        lastSuccessTime: '2025-10-31T12:00:00Z',
+        consecutiveFailures: 0,
+        isAuthenticated: true,
+        lastError: '',
+    };
+
+    const mockStatus2: BackendStatus = {
+        enabled: false,
+        lastPollTime: '2025-10-31T12:00:00Z',
+        lastSuccessTime: '2025-10-31T11:55:00Z',
+        consecutiveFailures: 5,
+        isAuthenticated: false,
+        lastError: 'Authentication failed',
+    };
+
     const mockOnChange = jest.fn();
 
     beforeEach(() => {
@@ -52,6 +71,7 @@ describe('BackendList', () => {
         const wrapper = shallow(
             <BackendList
                 backends={[]}
+                statusMap={{}}
                 onChange={mockOnChange}
             />,
         );
@@ -64,20 +84,28 @@ describe('BackendList', () => {
         const wrapper = shallow(
             <BackendList
                 backends={[mockBackend1, mockBackend2]}
+                statusMap={{}}
                 onChange={mockOnChange}
             />,
         );
 
         const cards = wrapper.find(BackendCard);
         expect(cards).toHaveLength(2);
-        expect(cards.at(0).prop('backend')).toEqual(mockBackend1);
-        expect(cards.at(1).prop('backend')).toEqual(mockBackend2);
+        expect(cards.at(0).prop('backend')).toMatchObject({
+            ...mockBackend1,
+            statusIndicator: StatusIndicator.Unknown,
+        });
+        expect(cards.at(1).prop('backend')).toMatchObject({
+            ...mockBackend2,
+            statusIndicator: StatusIndicator.Unknown,
+        });
     });
 
     it('should call onChange when a backend is updated', () => {
         const wrapper = shallow(
             <BackendList
                 backends={[mockBackend1, mockBackend2]}
+                statusMap={{}}
                 onChange={mockOnChange}
             />,
         );
@@ -93,6 +121,7 @@ describe('BackendList', () => {
         const wrapper = shallow(
             <BackendList
                 backends={[mockBackend1, mockBackend2]}
+                statusMap={{}}
                 onChange={mockOnChange}
             />,
         );
@@ -107,6 +136,7 @@ describe('BackendList', () => {
         const wrapper = shallow(
             <BackendList
                 backends={[mockBackend1]}
+                statusMap={{}}
                 onChange={mockOnChange}
             />,
         );
@@ -134,6 +164,7 @@ describe('BackendList', () => {
         const wrapper = shallow(
             <BackendList
                 backends={[mockBackend1, mockBackend2]}
+                statusMap={{}}
                 onChange={mockOnChange}
             />,
         );
@@ -141,5 +172,67 @@ describe('BackendList', () => {
         const cards = wrapper.find(BackendCard);
         expect(cards.at(0).key()).toBe('1');
         expect(cards.at(1).key()).toBe('2');
+    });
+
+    it('should merge status data with backend configs', () => {
+        const statusMap = {
+            1: mockStatus1,
+            2: mockStatus2,
+        };
+
+        const wrapper = shallow(
+            <BackendList
+                backends={[mockBackend1, mockBackend2]}
+                statusMap={statusMap}
+                onChange={mockOnChange}
+            />,
+        );
+
+        const cards = wrapper.find(BackendCard);
+        expect(cards).toHaveLength(2);
+
+        // Backend 1 should have Active status (consecutiveFailures = 0)
+        expect(cards.at(0).prop('backend')).toMatchObject({
+            ...mockBackend1,
+            status: mockStatus1,
+            statusIndicator: StatusIndicator.Active,
+        });
+
+        // Backend 2 should have Disabled status (consecutiveFailures >= 5 and enabled = false)
+        expect(cards.at(1).prop('backend')).toMatchObject({
+            ...mockBackend2,
+            status: mockStatus2,
+            statusIndicator: StatusIndicator.Disabled,
+        });
+    });
+
+    it('should show Unknown status when status data is not available', () => {
+        const statusMap = {
+            1: mockStatus1,
+
+            // Backend 2 has no status data
+        };
+
+        const wrapper = shallow(
+            <BackendList
+                backends={[mockBackend1, mockBackend2]}
+                statusMap={statusMap}
+                onChange={mockOnChange}
+            />,
+        );
+
+        const cards = wrapper.find(BackendCard);
+
+        // Backend 1 has status
+        expect(cards.at(0).prop('backend')).toMatchObject({
+            status: mockStatus1,
+            statusIndicator: StatusIndicator.Active,
+        });
+
+        // Backend 2 has no status (Unknown)
+        expect(cards.at(1).prop('backend')).toMatchObject({
+            statusIndicator: StatusIndicator.Unknown,
+        });
+        expect(cards.at(1).prop('backend').status).toBeUndefined();
     });
 });

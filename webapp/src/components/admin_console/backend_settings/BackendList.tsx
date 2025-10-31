@@ -8,7 +8,8 @@ import {PlusIcon} from '@mattermost/compass-icons/components';
 
 import BackendCard from './BackendCard';
 import {TertiaryButton} from './buttons';
-import type {BackendConfig} from './types';
+import type {BackendConfig, BackendStatus} from './types';
+import {mergeBackendStatus} from './types';
 
 const defaultNewBackend: Omit<BackendConfig, 'id'> = {
     name: '',
@@ -23,6 +24,7 @@ const defaultNewBackend: Omit<BackendConfig, 'id'> = {
 
 type Props = {
     backends: BackendConfig[];
+    statusMap: Record<string, BackendStatus>;
     onChange: (backends: BackendConfig[]) => void;
 };
 
@@ -47,10 +49,15 @@ const BackendList = (props: Props) => {
         props.onChange(props.backends.filter((b) => b.id !== id));
     };
 
+    // Merge backend configs with status data
+    const backendsWithStatus = props.backends.map((backend) =>
+        mergeBackendStatus(backend, props.statusMap),
+    );
+
     return (
         <>
             <BackendsListContainer>
-                {props.backends.map((backend) => (
+                {backendsWithStatus.map((backend) => (
                     <BackendCard
                         key={backend.id}
                         backend={backend}

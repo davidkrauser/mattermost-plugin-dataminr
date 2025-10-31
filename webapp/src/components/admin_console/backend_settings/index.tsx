@@ -7,6 +7,7 @@ import styled from 'styled-components';
 import BackendList from './BackendList';
 import NoBackendsPage from './NoBackendsPage';
 import type {BackendConfig} from './types';
+import {useBackendStatus} from './useBackendStatus';
 
 type Props = {
     id: string;
@@ -26,6 +27,7 @@ type Props = {
 
 const BackendSettings = (props: Props) => {
     const backends = props.value || [];
+    const {statusMap} = useBackendStatus();
 
     const handleBackendsChange = (newBackends: BackendConfig[]) => {
         props.onChange(props.id, newBackends);
@@ -62,6 +64,7 @@ const BackendSettings = (props: Props) => {
         <Container>
             <BackendList
                 backends={backends}
+                statusMap={statusMap}
                 onChange={handleBackendsChange}
             />
         </Container>

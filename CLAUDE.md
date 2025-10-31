@@ -595,6 +595,8 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 - **HTTP Mocking**: Use `httptest` for mocking external API calls (Dataminr)
 - **Integration Tests**: Tests exercising multiple components together, still using mocks, in `*_integration_test.go` files
 - **UUID Generation**: Use Go's built-in `crypto/rand` with standard UUID v4 format
+- **Linting**: Use `npm run fix` in the webapp directory to automatically fix ESLint issues
+- **Code Formatting**: Do NOT use `goimports` - use the standard `go fmt` or rely on `make check-style`
 
 ### Phase Status Tracking
 
@@ -615,7 +617,7 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 | 12 | ✅ Complete | Mattermost Poster |
 | 13 | ✅ Complete | Webapp Foundation & Types |
 | 14 | ✅ Complete | Backend List & Card UI |
-| 15 | ⬜ Not Started | Status Integration & Indicators |
+| 15 | ✅ Complete | Status Integration & Indicators |
 | 16 | ⬜ Not Started | Backend Form Fields |
 | 17 | ⬜ Not Started | CRUD Operations |
 | 18 | ⬜ Not Started | Persistence, Validation & Polish |
@@ -878,19 +880,23 @@ Implemented backend list and card UI with collapsible pattern:
 
 ---
 
-### Phase 15: Status Integration & Indicators ⬜
+### Phase 15: Status Integration & Indicators ✅
 
-**Goal**: Integrate real-time status polling and display health indicators.
+**Status**: Complete
+**Commits**: ca13f1d
 
-**Work**:
-- Create status polling service/hook that calls `/api/v1/backends/status` every 10 seconds
-- Merge status data with config data by matching backend UUIDs
-- Add status indicators to card headers: ✅ Active (0 failures), ⚠️ Warning (1-4 failures), ❌ Disabled (5+ failures), ❓ Unknown (no status)
-- Display in expanded card: last poll time, last success time, consecutive failures, auth status, last error message
-- Handle loading and error states for status API calls
-- Write tests for status polling, merging logic, and indicator display
-
-**Completion Criteria**: Real-time status visible for each backend, visual indicators working, all tests and lint checks passing
+Integrated real-time status polling with:
+- Client API (`client.ts`) for fetching backend status from `/api/v1/backends/status` endpoint
+- `useBackendStatus` hook with 10-second polling interval
+- Status indicators in BackendCard headers using colored pills (Active/Warning/Disabled/Unknown)
+- Status details section in expanded card:
+  - Consecutive failures count
+  - Authentication status
+  - Last poll and success timestamps
+  - Last error message display with red styling
+- Card background colors matching agents plugin style (`rgba(var(--center-channel-color-rgb), 0.02)` with hover)
+- Comprehensive unit tests for client, hook, and updated components
+- All tests and lint checks passing
 
 ---
 

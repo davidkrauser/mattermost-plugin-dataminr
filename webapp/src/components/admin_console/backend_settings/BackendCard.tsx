@@ -6,12 +6,14 @@ import styled from 'styled-components';
 
 import {TrashCanOutlineIcon, ChevronDownIcon, ChevronUpIcon, AlertOutlineIcon} from '@mattermost/compass-icons/components';
 
+import BackendForm from './BackendForm';
 import {ButtonIcon} from './buttons';
 import {GrayPill, SuccessPill, WarningPill, DangerPill} from './pill';
 import type {BackendConfig, BackendDisplay, StatusIndicator} from './types';
 
 type Props = {
     backend: BackendDisplay;
+    allBackends: BackendConfig[];
     onChange: (backend: BackendConfig) => void;
     onDelete: () => void;
 };
@@ -60,19 +62,12 @@ const BackendCard = (props: Props) => {
             </HeaderContainer>
             {open && (
                 <ContentContainer>
-                    <PlaceholderText>
-                        {'Backend configuration form will be implemented in Phase 16'}
-                    </PlaceholderText>
                     <SectionTitle>{'Configuration'}</SectionTitle>
-                    <InfoList>
-                        <InfoItem><strong>{'ID:'}</strong> {props.backend.id}</InfoItem>
-                        <InfoItem><strong>{'Name:'}</strong> {props.backend.name}</InfoItem>
-                        <InfoItem><strong>{'Type:'}</strong> {props.backend.type}</InfoItem>
-                        <InfoItem><strong>{'URL:'}</strong> {props.backend.url}</InfoItem>
-                        <InfoItem><strong>{'Channel ID:'}</strong> {props.backend.channelId}</InfoItem>
-                        <InfoItem><strong>{'Poll Interval:'}</strong> {props.backend.pollIntervalSeconds}{'s'}</InfoItem>
-                        <InfoItem><strong>{'Enabled:'}</strong> {props.backend.enabled ? 'Yes' : 'No'}</InfoItem>
-                    </InfoList>
+                    <BackendForm
+                        backend={props.backend}
+                        allBackends={props.allBackends}
+                        onChange={props.onChange}
+                    />
 
                     {props.backend.status && (
                         <>
@@ -179,13 +174,6 @@ const VerticalDivider = styled.div`
 
 const ContentContainer = styled.div`
     padding: 24px 20px;
-`;
-
-const PlaceholderText = styled.div`
-    font-size: 14px;
-    font-style: italic;
-    color: rgba(var(--center-channel-color-rgb), 0.56);
-    margin-bottom: 16px;
 `;
 
 const InfoList = styled.div`

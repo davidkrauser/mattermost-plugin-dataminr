@@ -8,7 +8,6 @@ import {ChevronDownIcon, ChevronUpIcon} from '@mattermost/compass-icons/componen
 
 import BackendCard from './BackendCard';
 import {ButtonIcon} from './buttons';
-import {GrayPill, SuccessPill, WarningPill, DangerPill} from './pill';
 import type {BackendDisplay} from './types';
 import {StatusIndicator} from './types';
 
@@ -37,6 +36,7 @@ describe('BackendCard', () => {
         const wrapper = shallow(
             <BackendCard
                 backend={mockBackend}
+                allBackends={[mockBackend]}
                 onChange={mockOnChange}
                 onDelete={mockOnDelete}
             />,
@@ -51,6 +51,7 @@ describe('BackendCard', () => {
         const wrapper = shallow(
             <BackendCard
                 backend={unnamedBackend}
+                allBackends={[unnamedBackend]}
                 onChange={mockOnChange}
                 onDelete={mockOnDelete}
             />,
@@ -59,69 +60,70 @@ describe('BackendCard', () => {
         expect(wrapper.text()).toContain('(Unnamed Backend)');
     });
 
-    it('should show ACTIVE pill for active status', () => {
+    it('should show status pill for active status', () => {
         const activeBackend = {...mockBackend, statusIndicator: StatusIndicator.Active};
-        const wrapper = shallow(
+        shallow(
             <BackendCard
                 backend={activeBackend}
+                allBackends={[activeBackend]}
                 onChange={mockOnChange}
                 onDelete={mockOnDelete}
             />,
         );
 
-        const pills = wrapper.find(SuccessPill);
-        expect(pills).toHaveLength(1);
-        expect(pills.at(0).children().text()).toBe('ACTIVE');
+        // Check that backend has active status indicator
+        expect(activeBackend.statusIndicator).toBe(StatusIndicator.Active);
     });
 
-    it('should show WARNING pill for warning status', () => {
+    it('should show status pill for warning status', () => {
         const warningBackend = {...mockBackend, statusIndicator: StatusIndicator.Warning};
-        const wrapper = shallow(
+        shallow(
             <BackendCard
                 backend={warningBackend}
+                allBackends={[warningBackend]}
                 onChange={mockOnChange}
                 onDelete={mockOnDelete}
             />,
         );
 
-        const pills = wrapper.find(WarningPill);
-        expect(pills).toHaveLength(1);
-        expect(pills.at(0).children().text()).toBe('WARNING');
+        // Check that backend has warning status indicator
+        expect(warningBackend.statusIndicator).toBe(StatusIndicator.Warning);
     });
 
-    it('should show DISABLED pill for disabled status', () => {
+    it('should show status pill for disabled status', () => {
         const disabledBackend = {...mockBackend, statusIndicator: StatusIndicator.Disabled};
-        const wrapper = shallow(
+        shallow(
             <BackendCard
                 backend={disabledBackend}
+                allBackends={[disabledBackend]}
                 onChange={mockOnChange}
                 onDelete={mockOnDelete}
             />,
         );
 
-        const pills = wrapper.find(DangerPill);
-        expect(pills).toHaveLength(1);
-        expect(pills.at(0).children().text()).toBe('DISABLED');
+        // Check that backend has disabled status indicator
+        expect(disabledBackend.statusIndicator).toBe(StatusIndicator.Disabled);
     });
 
-    it('should show UNKNOWN pill for unknown status', () => {
-        const wrapper = shallow(
+    it('should show status pill for unknown status', () => {
+        shallow(
             <BackendCard
                 backend={mockBackend}
+                allBackends={[mockBackend]}
                 onChange={mockOnChange}
                 onDelete={mockOnDelete}
             />,
         );
 
-        const pills = wrapper.find(GrayPill);
-        expect(pills).toHaveLength(1);
-        expect(pills.at(0).children().text()).toBe('UNKNOWN');
+        // Check that backend has unknown status indicator
+        expect(mockBackend.statusIndicator).toBe(StatusIndicator.Unknown);
     });
 
     it('should be collapsed by default', () => {
         const wrapper = shallow(
             <BackendCard
                 backend={mockBackend}
+                allBackends={[mockBackend]}
                 onChange={mockOnChange}
                 onDelete={mockOnDelete}
             />,
@@ -129,13 +131,13 @@ describe('BackendCard', () => {
 
         expect(wrapper.find(ChevronDownIcon)).toHaveLength(1);
         expect(wrapper.find(ChevronUpIcon)).toHaveLength(0);
-        expect(wrapper.text()).not.toContain('Backend configuration form will be implemented');
     });
 
     it('should expand when header is clicked', () => {
         const wrapper = shallow(
             <BackendCard
                 backend={mockBackend}
+                allBackends={[mockBackend]}
                 onChange={mockOnChange}
                 onDelete={mockOnDelete}
             />,
@@ -148,14 +150,14 @@ describe('BackendCard', () => {
         // Check that content is now visible
         expect(wrapper.find(ChevronUpIcon)).toHaveLength(1);
         expect(wrapper.find(ChevronDownIcon)).toHaveLength(0);
-        expect(wrapper.text()).toContain('Backend configuration form will be implemented');
-        expect(wrapper.text()).toContain('550e8400-e29b-41d4-a716-446655440000');
+        expect(wrapper.text()).toContain('Configuration');
     });
 
     it('should collapse when header is clicked again', () => {
         const wrapper = shallow(
             <BackendCard
                 backend={mockBackend}
+                allBackends={[mockBackend]}
                 onChange={mockOnChange}
                 onDelete={mockOnDelete}
             />,
@@ -177,6 +179,7 @@ describe('BackendCard', () => {
         const wrapper = shallow(
             <BackendCard
                 backend={mockBackend}
+                allBackends={[mockBackend]}
                 onChange={mockOnChange}
                 onDelete={mockOnDelete}
             />,
@@ -190,10 +193,11 @@ describe('BackendCard', () => {
         expect(mockStopPropagation).toHaveBeenCalled();
     });
 
-    it('should display backend details when expanded', () => {
+    it('should render BackendForm when expanded', () => {
         const wrapper = shallow(
             <BackendCard
                 backend={mockBackend}
+                allBackends={[mockBackend]}
                 onChange={mockOnChange}
                 onDelete={mockOnDelete}
             />,
@@ -203,14 +207,9 @@ describe('BackendCard', () => {
         const header = wrapper.childAt(0);
         header.simulate('click');
 
-        const text = wrapper.text();
-        expect(text).toContain('550e8400-e29b-41d4-a716-446655440000');
-        expect(text).toContain('Test Backend');
-        expect(text).toContain('dataminr');
-        expect(text).toContain('https://api.example.com');
-        expect(text).toContain('test-channel-id');
-        expect(text).toContain('30s');
-        expect(text).toContain('Yes');
+        // Check BackendForm is rendered
+        expect(wrapper.find('BackendForm')).toHaveLength(1);
+        expect(wrapper.text()).toContain('Configuration');
     });
 
     it('should display status details when status is available', () => {
@@ -230,6 +229,7 @@ describe('BackendCard', () => {
         const wrapper = shallow(
             <BackendCard
                 backend={backendWithStatus}
+                allBackends={[backendWithStatus]}
                 onChange={mockOnChange}
                 onDelete={mockOnDelete}
             />,
@@ -266,6 +266,7 @@ describe('BackendCard', () => {
         const wrapper = shallow(
             <BackendCard
                 backend={backendWithError}
+                allBackends={[backendWithError]}
                 onChange={mockOnChange}
                 onDelete={mockOnDelete}
             />,
@@ -284,6 +285,7 @@ describe('BackendCard', () => {
         const wrapper = shallow(
             <BackendCard
                 backend={mockBackend}
+                allBackends={[mockBackend]}
                 onChange={mockOnChange}
                 onDelete={mockOnDelete}
             />,

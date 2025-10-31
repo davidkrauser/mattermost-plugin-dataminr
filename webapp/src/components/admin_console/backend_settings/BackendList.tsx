@@ -61,6 +61,7 @@ const BackendList = (props: Props) => {
                     <BackendCard
                         key={backend.id}
                         backend={backend}
+                        allBackends={props.backends}
                         onChange={onChange}
                         onDelete={() => onDelete(backend.id)}
                     />

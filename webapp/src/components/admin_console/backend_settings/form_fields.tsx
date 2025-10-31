@@ -27,7 +27,9 @@ export type TextItemProps = {
     step?: string;
     min?: string;
     max?: string;
+    hasError?: boolean;
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
 };
 
 export const TextItem = (props: TextItemProps) => {
@@ -41,10 +43,12 @@ export const TextItem = (props: TextItemProps) => {
                     type={props.type ? props.type : 'text'}
                     placeholder={props.placeholder ? props.placeholder : props.label}
                     onChange={props.onChange}
+                    onBlur={props.onBlur}
                     maxLength={props.maxLength}
                     step={props.step}
                     min={props.min}
                     max={props.max}
+                    hasError={props.hasError}
                 />
                 {props.helptext &&
                 <HelpText>{props.helptext}</HelpText>
@@ -104,13 +108,13 @@ export const HelpText = styled.div`
     color: rgba(var(--center-channel-color-rgb), 0.72);
 `;
 
-export const StyledInput = styled.input<{ as?: string }>`
+export const StyledInput = styled.input<{ as?: string; hasError?: boolean }>`
     appearance: none;
     display: flex;
     padding: 7px 12px;
     align-items: flex-start;
     border-radius: 2px;
-    border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+    border: 1px solid ${(props) => (props.hasError ? 'var(--error-text)' : 'rgba(var(--center-channel-color-rgb), 0.16)')};
     box-shadow: 0px 1px 1px rgba(0, 0, 0, 0.075) inset;
     height: 35px;
     background: white;
@@ -125,8 +129,8 @@ export const StyledInput = styled.input<{ as?: string }>`
     `}
 
     &:focus {
-        border-color: #66afe9;
-        box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075), 0 0 8px rgba(102, 175, 233, 0.75);
+        border-color: ${(props) => (props.hasError ? 'var(--error-text)' : '#66afe9')};
+        box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075), 0 0 8px ${(props) => (props.hasError ? 'rgba(210, 75, 78, 0.5)' : 'rgba(102, 175, 233, 0.75)')};
         outline: 0;
     }
 `;

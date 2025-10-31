@@ -902,24 +902,51 @@ Integrated real-time status polling with:
 
 ### Phase 16: Backend Form Fields ⬜
 
-**Goal**: Implement form for viewing/editing backend configuration.
+**Goal**: Implement form for viewing/editing backend configuration with comprehensive client-side validation.
+
+**Validation Requirements**:
+
+Client-side validation must mirror server-side validation (Section 3.3) to catch errors early and provide immediate feedback. This prevents the UX issue where invalid configs fail server validation silently, leaving backends in "Unknown" state with no error feedback.
+
+**Validation Rules** (matching server):
+1. **Required Fields**: All fields must be non-empty (name, type, url, apiId, apiKey, channelId, pollIntervalSeconds)
+2. **UUID Format**: Backend `id` must be valid UUID v4 (auto-generated via `crypto.randomUUID()`)
+3. **Duplicate Names**: Name must be unique across all backends in the configuration
+4. **Type Support**: Type must be "dataminr" (only supported type currently)
+5. **URL Format**: URL must be valid and use HTTPS protocol
+6. **Poll Interval**: pollIntervalSeconds must be >= 10 (MinPollIntervalSeconds constant)
+
+**Cannot Validate Client-Side**:
+- Channel Access: Requires server API call to check bot permissions (server handles this)
 
 **Work**:
-- Create `BackendForm.tsx` component (rendered inline in expanded card)
-- Implement all form fields:
-  - Name (text input)
-  - Type (dropdown, hardcoded "dataminr" option for now)
-  - Enabled (toggle switch)
-  - URL (text input)
-  - API ID (text input)
-  - API Key (password input)
-  - Channel ID (text input, no autocomplete)
-  - Poll Interval Seconds (number input, min: 10)
-- Basic field validation (non-empty fields only, backend handles detailed validation)
-- Use `crypto.randomUUID()` for generating IDs for new backends
-- Write tests for form rendering, validation, and field interactions
+- Create `validation.ts` utility with validation functions:
+  - `validateBackendConfig(config: BackendConfig, allBackends: BackendConfig[]): ValidationErrors`
+  - `isValidUUID(id: string): boolean`
+  - `isValidHttpsUrl(url: string): boolean`
+  - `hasDuplicateName(name: string, currentId: string, allBackends: BackendConfig[]): boolean`
+  - Return typed error objects with field-specific error messages
+- Create `BackendForm.tsx` component (rendered inline in expanded card):
+  - All form fields with proper input types:
+    - Name (text input, required)
+    - Type (dropdown, hardcoded "dataminr" option, disabled for now since only one type)
+    - Enabled (toggle switch)
+    - URL (text input, required, HTTPS validation)
+    - API ID (text input, required)
+    - API Key (password input, required)
+    - Channel ID (text input, required, no autocomplete)
+    - Poll Interval Seconds (number input, required, min: 10, default: 30)
+  - Real-time validation on field blur
+  - Display field-specific error messages below each field
+  - Disable form submission if validation fails
+  - Visual indicators for invalid fields (red border, error text)
+- Write comprehensive tests:
+  - All validation rules (required fields, UUID format, duplicate names, HTTPS URLs, poll interval)
+  - Form rendering with all fields
+  - Error message display
+  - Validation state management
 
-**Completion Criteria**: Form displays all fields, basic validation works, can view/edit backend details (no save yet), all tests and lint checks passing
+**Completion Criteria**: Form displays all fields with comprehensive validation, validation errors are shown immediately on blur, prevents submission of invalid data, all tests and lint checks passing
 
 ---
 

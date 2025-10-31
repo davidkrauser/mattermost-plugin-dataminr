@@ -88,7 +88,7 @@ describe('BackendForm', () => {
 
         // Test name field change
         const nameField = wrapper.find('TextItem').at(0);
-        nameField.prop('onChange')({target: {value: 'New Name'}} as any);
+        nameField.prop('onChange')!({target: {value: 'New Name'}} as any);
         expect(mockOnChange).toHaveBeenCalledWith({
             ...validBackend,
             name: 'New Name',
@@ -98,7 +98,8 @@ describe('BackendForm', () => {
 
         // Test enabled field change
         const enabledField = wrapper.find('BooleanItem');
-        enabledField.prop('onChange')(false);
+        const enabledOnChange = enabledField.prop('onChange') as unknown as ((to: boolean) => void);
+        enabledOnChange(false);
         expect(mockOnChange).toHaveBeenCalledWith({
             ...validBackend,
             enabled: false,
@@ -108,7 +109,7 @@ describe('BackendForm', () => {
 
         // Test url field change
         const urlField = wrapper.find('TextItem').at(1);
-        urlField.prop('onChange')({target: {value: 'https://new-url.com'}} as any);
+        urlField.prop('onChange')!({target: {value: 'https://new-url.com'}} as any);
         expect(mockOnChange).toHaveBeenCalledWith({
             ...validBackend,
             url: 'https://new-url.com',
@@ -148,8 +149,9 @@ describe('BackendForm', () => {
 
         // Blur the name field
         const nameField = wrapper.find('TextItem').at(0);
-        if (nameField.prop('onBlur')) {
-            nameField.prop('onBlur')({} as any);
+        const onBlur = nameField.prop('onBlur');
+        if (onBlur) {
+            onBlur({} as any);
         }
 
         // Re-render to see the error
@@ -182,8 +184,9 @@ describe('BackendForm', () => {
 
         // Blur the name field
         const nameField = wrapper.find('TextItem').at(0);
-        if (nameField.prop('onBlur')) {
-            nameField.prop('onBlur')({} as any);
+        const onBlur = nameField.prop('onBlur');
+        if (onBlur) {
+            onBlur({} as any);
         }
 
         wrapper.update();
@@ -209,8 +212,9 @@ describe('BackendForm', () => {
 
         // Blur the url field
         const urlField = wrapper.find('TextItem').at(1);
-        if (urlField.prop('onBlur')) {
-            urlField.prop('onBlur')({} as any);
+        const onBlur = urlField.prop('onBlur');
+        if (onBlur) {
+            onBlur({} as any);
         }
 
         wrapper.update();
@@ -236,8 +240,9 @@ describe('BackendForm', () => {
 
         // Blur the poll interval field
         const pollIntervalField = wrapper.find('TextItem').at(5);
-        if (pollIntervalField.prop('onBlur')) {
-            pollIntervalField.prop('onBlur')({} as any);
+        const onBlur = pollIntervalField.prop('onBlur');
+        if (onBlur) {
+            onBlur({} as any);
         }
 
         wrapper.update();
@@ -257,7 +262,7 @@ describe('BackendForm', () => {
         );
 
         const pollIntervalField = wrapper.find('TextItem').at(5);
-        pollIntervalField.prop('onChange')({target: {value: '60'}} as any);
+        pollIntervalField.prop('onChange')!({target: {value: '60'}} as any);
 
         expect(mockOnChange).toHaveBeenCalledWith({
             ...validBackend,
@@ -288,8 +293,9 @@ describe('BackendForm', () => {
 
         // Blur all fields
         wrapper.find('TextItem').forEach((field) => {
-            if (field.prop('onBlur')) {
-                field.prop('onBlur')({} as any);
+            const onBlur = field.prop('onBlur');
+            if (onBlur) {
+                onBlur({} as any);
             }
         });
 

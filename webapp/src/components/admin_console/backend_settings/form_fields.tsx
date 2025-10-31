@@ -2,7 +2,6 @@
 // See LICENSE.txt for license information.
 
 import React from 'react';
-import {FormattedMessage} from 'react-intl';
 import styled from 'styled-components';
 
 export const ItemList = styled.div`
@@ -185,14 +184,14 @@ export const BooleanItem = (props: BooleanItemProps) => {
                         checked={props.value}
                         onChange={() => props.onChange(true)}
                     />
-                    <FormattedMessage defaultMessage='true'/>
+                    <span>{'true'}</span>
                     <StyledRadio
                         type='radio'
                         value='false'
                         checked={!props.value}
                         onChange={() => props.onChange(false)}
                     />
-                    <FormattedMessage defaultMessage='false'/>
+                    <span>{'false'}</span>
                 </BooleanItemRow>
                 {props.helpText &&
                 <HelpText>{props.helpText}</HelpText>

@@ -15,14 +15,14 @@ type Props = {
     helpText: React.ReactNode;
     value: BackendConfig[];
     disabled: boolean;
-    config: any;
-    currentState: any;
-    license: any;
+    config?: any;
+    currentState?: any;
+    license?: any;
     setByEnv: boolean;
     onChange: (id: string, value: any) => void;
     setSaveNeeded: () => void;
-    registerSaveAction: (action: () => Promise<{error?: {message?: string}}>) => void;
-    unRegisterSaveAction: (action: () => Promise<{error?: {message?: string}}>) => void;
+    registerSaveAction?: (action: () => Promise<{error?: {message?: string}}>) => void;
+    unRegisterSaveAction?: (action: () => Promise<{error?: {message?: string}}>) => void;
 };
 
 const BackendSettings = (props: Props) => {

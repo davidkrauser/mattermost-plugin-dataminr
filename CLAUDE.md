@@ -595,7 +595,10 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 - **HTTP Mocking**: Use `httptest` for mocking external API calls (Dataminr)
 - **Integration Tests**: Tests exercising multiple components together, still using mocks, in `*_integration_test.go` files
 - **UUID Generation**: Use Go's built-in `crypto/rand` with standard UUID v4 format
-- **Linting**: Use `npm run fix` in the webapp directory to automatically fix ESLint issues
+- **Linting**:
+  - **IMPORTANT**: Always run `make check-style` before committing to catch TypeScript and Go linting errors
+  - Use `npm run fix` in the webapp directory to automatically fix ESLint issues
+  - TypeScript errors must be fixed manually (use non-null assertions `!` or type assertions `as` when appropriate)
 - **Code Formatting**: Do NOT use `goimports` - use the standard `go fmt` or rely on `make check-style`
 
 ### Phase Status Tracking

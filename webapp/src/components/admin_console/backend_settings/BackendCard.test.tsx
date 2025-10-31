@@ -149,7 +149,8 @@ describe('BackendCard', () => {
         // Find the first element with an onClick that changes state
         const clickableElements = wrapper.find('[onClick]');
         const headerElement = clickableElements.at(0);
-        headerElement.prop('onClick')();
+        const onClick = headerElement.prop('onClick') as () => void;
+        onClick();
 
         // Check that content is now visible
         wrapper.update();
@@ -172,12 +173,12 @@ describe('BackendCard', () => {
         const headerElement = clickableElements.at(0);
 
         // Expand
-        headerElement.prop('onClick')();
+        (headerElement.prop('onClick') as () => void)();
         wrapper.update();
         expect(wrapper.find(ChevronUpIcon)).toHaveLength(1);
 
         // Collapse
-        headerElement.prop('onClick')();
+        (headerElement.prop('onClick') as () => void)();
         wrapper.update();
         expect(wrapper.find(ChevronDownIcon)).toHaveLength(1);
         expect(wrapper.find(ChevronUpIcon)).toHaveLength(0);
@@ -263,7 +264,8 @@ describe('BackendCard', () => {
         // Expand card
         const clickableElements = wrapper.find('[onClick]');
         const headerElement = clickableElements.at(0);
-        headerElement.prop('onClick')();
+        const onClick = headerElement.prop('onClick') as () => void;
+        onClick();
 
         // Check BackendForm is rendered
         wrapper.update();
@@ -297,7 +299,8 @@ describe('BackendCard', () => {
         // Expand card
         const clickableElements = wrapper.find('[onClick]');
         const headerElement = clickableElements.at(0);
-        headerElement.prop('onClick')();
+        const onClick = headerElement.prop('onClick') as () => void;
+        onClick();
 
         wrapper.update();
         const text = wrapper.text();
@@ -336,7 +339,8 @@ describe('BackendCard', () => {
         // Expand card
         const clickableElements = wrapper.find('[onClick]');
         const headerElement = clickableElements.at(0);
-        headerElement.prop('onClick')();
+        const onClick = headerElement.prop('onClick') as () => void;
+        onClick();
 
         wrapper.update();
         const text = wrapper.text();
@@ -357,7 +361,8 @@ describe('BackendCard', () => {
         // Expand card
         const clickableElements = wrapper.find('[onClick]');
         const headerElement = clickableElements.at(0);
-        headerElement.prop('onClick')();
+        const onClick = headerElement.prop('onClick') as () => void;
+        onClick();
 
         wrapper.update();
         const text = wrapper.text();
@@ -385,7 +390,8 @@ describe('BackendCard', () => {
         // Expand card
         const clickableElements = wrapper.find('[onClick]');
         const headerElement = clickableElements.at(0);
-        headerElement.prop('onClick')();
+        const onClick = headerElement.prop('onClick') as () => void;
+        onClick();
 
         wrapper.update();
         const text = wrapper.text();

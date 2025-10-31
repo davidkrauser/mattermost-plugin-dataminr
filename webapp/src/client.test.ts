@@ -1,38 +1,32 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import {Client4} from '@mattermost/client';
-
 import {getBackendsStatus} from './client';
 
-// Mock the Client4
-jest.mock('@mattermost/client', () => ({
-    Client4: jest.fn(),
-    ClientError: class ClientError extends Error {
-        status_code: number;
-        url: string;
-
-        constructor(baseUrl: string, data: {message: string; status_code: number; url: string}) {
-            super(data.message);
-            this.status_code = data.status_code;
-            this.url = data.url;
-            this.name = 'ClientError';
-        }
-    },
-}));
-
-describe('client', () => {
-    let mockGetOptions: jest.Mock;
-
-    beforeEach(() => {
-        mockGetOptions = jest.fn((opts) => opts);
-
-        // Mock Client4 instance
-        (Client4 as unknown as jest.Mock).mockImplementation(() => ({
+// Mock the Client4 module
+jest.mock('@mattermost/client', () => {
+    const mockGetOptions = jest.fn((opts) => opts);
+    return {
+        Client4: jest.fn().mockImplementation(() => ({
             getOptions: mockGetOptions,
             url: 'http://localhost:8065',
-        }));
+        })),
+        ClientError: class ClientError extends Error {
+            status_code: number;
+            url: string;
 
+            constructor(baseUrl: string, data: {message: string; status_code: number; url: string}) {
+                super(data.message);
+                this.status_code = data.status_code;
+                this.url = data.url;
+                this.name = 'ClientError';
+            }
+        },
+    };
+});
+
+describe('client', () => {
+    beforeEach(() => {
         // Reset fetch mock
         global.fetch = jest.fn();
     });
@@ -62,7 +56,7 @@ describe('client', () => {
             const result = await getBackendsStatus();
 
             expect(global.fetch).toHaveBeenCalledWith(
-                '/plugins/com.mattermost.dataminr/api/v1/backends/status',
+                '/plugins/com.mattermost.plugin-dataminr/api/v1/backends/status',
                 expect.objectContaining({
                     method: 'GET',
                 }),

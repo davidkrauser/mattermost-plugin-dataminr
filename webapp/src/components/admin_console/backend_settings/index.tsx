@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import styled from 'styled-components';
 
 import BackendList from './BackendList';
@@ -30,16 +30,44 @@ const BackendSettings = (props: Props) => {
     const backends = props.value || [];
     const {statusMap} = useBackendStatus();
 
-    // Validation errors shown after save attempt
+    // Validation errors shown after save attempt or on component mount
     const [validationErrors, setValidationErrors] = useState<Record<string, ValidationErrors>>({});
 
+    // Track if user has made changes to avoid re-validating during edits
+    const userHasMadeChanges = useRef(false);
+
     const handleBackendsChange = (newBackends: BackendConfig[]) => {
+        userHasMadeChanges.current = true;
         props.onChange(props.id, newBackends);
         props.setSaveNeeded();
 
         // Clear validation errors when user makes changes
         setValidationErrors({});
     };
+
+    // Validate backends on mount or when loaded from config (e.g., page refresh)
+    useEffect(() => {
+        // Skip validation if user has made changes (validation errors were already cleared)
+        if (userHasMadeChanges.current) {
+            return;
+        }
+
+        // Validate all backends
+        const errors: Record<string, ValidationErrors> = {};
+        let hasErrors = false;
+
+        backends.forEach((backend) => {
+            const backendErrors = validateBackendConfig(backend, backends);
+            if (hasValidationErrors(backendErrors)) {
+                errors[backend.id] = backendErrors;
+                hasErrors = true;
+            }
+        });
+
+        if (hasErrors) {
+            setValidationErrors(errors);
+        }
+    }, [backends]);
 
     // Register save action for validation
     useEffect(() => {
@@ -70,7 +98,7 @@ const BackendSettings = (props: Props) => {
         };
 
         props.registerSaveAction(saveAction);
-        return () => props.unRegisterSaveAction(saveAction);
+        return () => props.unRegisterSaveAction!(saveAction);
     }, [backends, props.registerSaveAction, props.unRegisterSaveAction]);
 
     const handleAddBackend = () => {

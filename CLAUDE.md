@@ -96,7 +96,6 @@ The plugin configuration in `plugin.json` will have the following settings:
 {
   "settings_schema": {
     "header": "Configure backends to monitor for alerts. Each backend polls for events and posts them to a designated Mattermost channel.",
-    "footer": "Note: Configuration changes require a plugin reload to take effect.",
     "settings": [
       {
         "key": "Backends",
@@ -480,7 +479,7 @@ When a backend experiences errors:
 - When a backend is disabled due to `MaxConsecutiveFailures`:
   - Log critical error with backend details and last error message
   - Update backend status in KV store to reflect disabled state
-  - Backend will not resume until admin re-enables it via configuration or plugin reload
+  - Backend will not resume until admin re-enables it via configuration
 - Administrators should monitor server logs for backend health
 
 ---

@@ -20,7 +20,6 @@
     },
     "settings_schema": {
         "header": "Configure backends to monitor for alerts. Each backend polls for events and posts them to a designated Mattermost channel.",
-        "footer": "Note: Configuration changes require a plugin reload to take effect.",
         "settings": [
             {
                 "key": "BotUsername",

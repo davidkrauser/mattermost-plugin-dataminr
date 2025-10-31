@@ -106,8 +106,15 @@ func (p *Poller) nextWaitInterval(now time.Time, metadata cluster.JobMetadata) t
 		return 0
 	}
 
-	// For subsequent runs, wait the full poll interval
-	return p.interval
+	// Check if enough time has passed since last finished
+	sinceLastFinished := now.Sub(metadata.LastFinished)
+	if sinceLastFinished < p.interval {
+		// Not enough time elapsed, return remaining wait time
+		return p.interval - sinceLastFinished
+	}
+
+	// Enough time has passed, run immediately
+	return 0
 }
 
 // run is called by the cluster job scheduler to execute a poll cycle

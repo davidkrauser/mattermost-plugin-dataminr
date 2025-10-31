@@ -40,7 +40,7 @@ func TestPoller_nextWaitInterval(t *testing.T) {
 		assert.Equal(t, time.Duration(0), interval, "First run should execute immediately")
 	})
 
-	t.Run("subsequent runs wait full interval", func(t *testing.T) {
+	t.Run("subsequent run with time remaining returns remaining wait", func(t *testing.T) {
 		api := plugintest.NewAPI(t)
 		client := pluginapi.NewClient(api, &plugintest.Driver{})
 
@@ -63,7 +63,59 @@ func TestPoller_nextWaitInterval(t *testing.T) {
 		}
 
 		interval := poller.nextWaitInterval(now, metadata)
-		assert.Equal(t, pollInterval, interval, "Should wait full poll interval")
+		assert.Equal(t, 20*time.Second, interval, "Should wait remaining 20 seconds")
+	})
+
+	t.Run("subsequent run after full interval executes immediately", func(t *testing.T) {
+		api := plugintest.NewAPI(t)
+		client := pluginapi.NewClient(api, &plugintest.Driver{})
+
+		pollInterval := 30 * time.Second
+		poller := NewPoller(
+			client,
+			api,
+			"test-backend-id",
+			"Test Backend",
+			pollInterval,
+			nil,
+			nil,
+			nil,
+			nil,
+		)
+
+		now := time.Now()
+		metadata := cluster.JobMetadata{
+			LastFinished: now.Add(-30 * time.Second), // Previously ran 30 seconds ago
+		}
+
+		interval := poller.nextWaitInterval(now, metadata)
+		assert.Equal(t, time.Duration(0), interval, "Should execute immediately after full interval")
+	})
+
+	t.Run("subsequent run after more than interval executes immediately", func(t *testing.T) {
+		api := plugintest.NewAPI(t)
+		client := pluginapi.NewClient(api, &plugintest.Driver{})
+
+		pollInterval := 30 * time.Second
+		poller := NewPoller(
+			client,
+			api,
+			"test-backend-id",
+			"Test Backend",
+			pollInterval,
+			nil,
+			nil,
+			nil,
+			nil,
+		)
+
+		now := time.Now()
+		metadata := cluster.JobMetadata{
+			LastFinished: now.Add(-45 * time.Second), // Previously ran 45 seconds ago
+		}
+
+		interval := poller.nextWaitInterval(now, metadata)
+		assert.Equal(t, time.Duration(0), interval, "Should execute immediately when past interval")
 	})
 }
 

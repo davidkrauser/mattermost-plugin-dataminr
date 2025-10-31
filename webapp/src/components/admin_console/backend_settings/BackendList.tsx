@@ -10,6 +10,7 @@ import BackendCard from './BackendCard';
 import {TertiaryButton} from './buttons';
 import type {BackendConfig, BackendStatus} from './types';
 import {mergeBackendStatus} from './types';
+import type {ValidationErrors} from './validation';
 
 const defaultNewBackend: Omit<BackendConfig, 'id'> = {
     name: '',
@@ -26,6 +27,7 @@ type Props = {
     backends: BackendConfig[];
     statusMap: Record<string, BackendStatus>;
     onChange: (backends: BackendConfig[]) => void;
+    validationErrors?: Record<string, ValidationErrors>;
 };
 
 const BackendList = (props: Props) => {
@@ -64,6 +66,7 @@ const BackendList = (props: Props) => {
                         allBackends={props.backends}
                         onChange={onChange}
                         onDelete={() => onDelete(backend.id)}
+                        validationErrors={props.validationErrors?.[backend.id]}
                     />
                 ))}
             </BackendsListContainer>

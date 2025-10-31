@@ -235,4 +235,54 @@ describe('BackendList', () => {
         });
         expect(cards.at(1).prop('backend').status).toBeUndefined();
     });
+
+    it('should pass validation errors to backend cards', () => {
+        const validationErrors = {
+            1: {
+                name: 'Name is required',
+                url: 'Invalid URL',
+            },
+            2: {
+                apiId: 'API ID is required',
+            },
+        };
+
+        const wrapper = shallow(
+            <BackendList
+                backends={[mockBackend1, mockBackend2]}
+                statusMap={{}}
+                onChange={mockOnChange}
+                validationErrors={validationErrors}
+            />,
+        );
+
+        const cards = wrapper.find(BackendCard);
+
+        // Backend 1 should receive its validation errors
+        expect(cards.at(0).prop('validationErrors')).toEqual({
+            name: 'Name is required',
+            url: 'Invalid URL',
+        });
+
+        // Backend 2 should receive its validation errors
+        expect(cards.at(1).prop('validationErrors')).toEqual({
+            apiId: 'API ID is required',
+        });
+    });
+
+    it('should not pass validation errors when none are present', () => {
+        const wrapper = shallow(
+            <BackendList
+                backends={[mockBackend1, mockBackend2]}
+                statusMap={{}}
+                onChange={mockOnChange}
+            />,
+        );
+
+        const cards = wrapper.find(BackendCard);
+
+        // No validation errors should be passed
+        expect(cards.at(0).prop('validationErrors')).toBeUndefined();
+        expect(cards.at(1).prop('validationErrors')).toBeUndefined();
+    });
 });

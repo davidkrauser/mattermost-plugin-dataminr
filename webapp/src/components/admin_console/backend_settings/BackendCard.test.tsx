@@ -8,8 +8,10 @@ import {ChevronDownIcon, ChevronUpIcon} from '@mattermost/compass-icons/componen
 
 import BackendCard from './BackendCard';
 import {ButtonIcon} from './buttons';
+import ConfirmationDialog from './ConfirmationDialog';
 import type {BackendDisplay} from './types';
 import {StatusIndicator} from './types';
+import type {ValidationErrors} from './validation';
 
 describe('BackendCard', () => {
     const mockBackend: BackendDisplay = {
@@ -143,11 +145,14 @@ describe('BackendCard', () => {
             />,
         );
 
-        // Find the clickable header (first child of the root)
-        const header = wrapper.childAt(0);
-        header.simulate('click');
+        // Simulate click by calling the onClick handler
+        // Find the first element with an onClick that changes state
+        const clickableElements = wrapper.find('[onClick]');
+        const headerElement = clickableElements.at(0);
+        headerElement.prop('onClick')();
 
         // Check that content is now visible
+        wrapper.update();
         expect(wrapper.find(ChevronUpIcon)).toHaveLength(1);
         expect(wrapper.find(ChevronDownIcon)).toHaveLength(0);
         expect(wrapper.text()).toContain('Configuration');
@@ -163,19 +168,22 @@ describe('BackendCard', () => {
             />,
         );
 
-        const header = wrapper.childAt(0);
+        const clickableElements = wrapper.find('[onClick]');
+        const headerElement = clickableElements.at(0);
 
         // Expand
-        header.simulate('click');
+        headerElement.prop('onClick')();
+        wrapper.update();
         expect(wrapper.find(ChevronUpIcon)).toHaveLength(1);
 
         // Collapse
-        header.simulate('click');
+        headerElement.prop('onClick')();
+        wrapper.update();
         expect(wrapper.find(ChevronDownIcon)).toHaveLength(1);
         expect(wrapper.find(ChevronUpIcon)).toHaveLength(0);
     });
 
-    it('should call onDelete when delete button is clicked', () => {
+    it('should show confirmation dialog when delete button is clicked', () => {
         const wrapper = shallow(
             <BackendCard
                 backend={mockBackend}
@@ -189,8 +197,57 @@ describe('BackendCard', () => {
         const mockStopPropagation = jest.fn();
         deleteButton.simulate('click', {stopPropagation: mockStopPropagation});
 
-        expect(mockOnDelete).toHaveBeenCalledTimes(1);
+        // Should show confirmation dialog, not call onDelete immediately
+        expect(mockOnDelete).not.toHaveBeenCalled();
         expect(mockStopPropagation).toHaveBeenCalled();
+        expect(wrapper.find(ConfirmationDialog)).toHaveLength(1);
+    });
+
+    it('should call onDelete when confirmation dialog is confirmed', () => {
+        const wrapper = shallow(
+            <BackendCard
+                backend={mockBackend}
+                allBackends={[mockBackend]}
+                onChange={mockOnChange}
+                onDelete={mockOnDelete}
+            />,
+        );
+
+        // Click delete button to show dialog
+        const deleteButton = wrapper.find(ButtonIcon);
+        deleteButton.simulate('click', {stopPropagation: jest.fn()});
+
+        // Confirm delete in dialog
+        const dialog = wrapper.find(ConfirmationDialog);
+        dialog.prop('onConfirm')();
+
+        expect(mockOnDelete).toHaveBeenCalledTimes(1);
+    });
+
+    it('should close confirmation dialog when cancelled', () => {
+        const wrapper = shallow(
+            <BackendCard
+                backend={mockBackend}
+                allBackends={[mockBackend]}
+                onChange={mockOnChange}
+                onDelete={mockOnDelete}
+            />,
+        );
+
+        // Click delete button to show dialog
+        const deleteButton = wrapper.find(ButtonIcon);
+        deleteButton.simulate('click', {stopPropagation: jest.fn()});
+
+        // Confirm dialog is shown
+        expect(wrapper.find(ConfirmationDialog)).toHaveLength(1);
+
+        // Cancel dialog
+        const dialog = wrapper.find(ConfirmationDialog);
+        dialog.prop('onCancel')();
+
+        // Dialog should be closed and onDelete not called
+        expect(wrapper.find(ConfirmationDialog)).toHaveLength(0);
+        expect(mockOnDelete).not.toHaveBeenCalled();
     });
 
     it('should render BackendForm when expanded', () => {
@@ -204,10 +261,12 @@ describe('BackendCard', () => {
         );
 
         // Expand card
-        const header = wrapper.childAt(0);
-        header.simulate('click');
+        const clickableElements = wrapper.find('[onClick]');
+        const headerElement = clickableElements.at(0);
+        headerElement.prop('onClick')();
 
         // Check BackendForm is rendered
+        wrapper.update();
         expect(wrapper.find('BackendForm')).toHaveLength(1);
         expect(wrapper.text()).toContain('Configuration');
     });
@@ -236,9 +295,11 @@ describe('BackendCard', () => {
         );
 
         // Expand card
-        const header = wrapper.childAt(0);
-        header.simulate('click');
+        const clickableElements = wrapper.find('[onClick]');
+        const headerElement = clickableElements.at(0);
+        headerElement.prop('onClick')();
 
+        wrapper.update();
         const text = wrapper.text();
         expect(text).toContain('Status');
         expect(text).toContain('Consecutive Failures:');
@@ -273,9 +334,11 @@ describe('BackendCard', () => {
         );
 
         // Expand card
-        const header = wrapper.childAt(0);
-        header.simulate('click');
+        const clickableElements = wrapper.find('[onClick]');
+        const headerElement = clickableElements.at(0);
+        headerElement.prop('onClick')();
 
+        wrapper.update();
         const text = wrapper.text();
         expect(text).toContain('Last Error:');
         expect(text).toContain('Authentication failed: invalid credentials');
@@ -292,12 +355,62 @@ describe('BackendCard', () => {
         );
 
         // Expand card
-        const header = wrapper.childAt(0);
-        header.simulate('click');
+        const clickableElements = wrapper.find('[onClick]');
+        const headerElement = clickableElements.at(0);
+        headerElement.prop('onClick')();
 
+        wrapper.update();
         const text = wrapper.text();
         expect(text).toContain('Configuration');
         expect(text).not.toContain('Consecutive Failures:');
         expect(text).not.toContain('Authenticated:');
+    });
+
+    it('should display validation errors when present', () => {
+        const validationErrors: ValidationErrors = {
+            name: 'Name is required',
+            url: 'URL must be a valid HTTPS URL',
+        };
+
+        const wrapper = shallow(
+            <BackendCard
+                backend={mockBackend}
+                allBackends={[mockBackend]}
+                onChange={mockOnChange}
+                onDelete={mockOnDelete}
+                validationErrors={validationErrors}
+            />,
+        );
+
+        // Expand card
+        const clickableElements = wrapper.find('[onClick]');
+        const headerElement = clickableElements.at(0);
+        headerElement.prop('onClick')();
+
+        wrapper.update();
+        const text = wrapper.text();
+        expect(text).toContain('Validation Errors');
+        expect(text).toContain('name');
+        expect(text).toContain('Name is required');
+        expect(text).toContain('url');
+        expect(text).toContain('URL must be a valid HTTPS URL');
+    });
+
+    it('should not display validation errors when none are present', () => {
+        const wrapper = shallow(
+            <BackendCard
+                backend={mockBackend}
+                allBackends={[mockBackend]}
+                onChange={mockOnChange}
+                onDelete={mockOnDelete}
+            />,
+        );
+
+        // Expand card
+        const header = wrapper.childAt(0);
+        header.simulate('click');
+
+        const text = wrapper.text();
+        expect(text).not.toContain('Validation Errors');
     });
 });

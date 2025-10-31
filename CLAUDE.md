@@ -615,7 +615,7 @@ Integration tests (using `_integration_test.go` files) are added at the end of a
 | 11 | ✅ Complete | Alert Formatter |
 | 12 | ✅ Complete | Mattermost Poster |
 | 13 | ✅ Complete | Webapp Foundation & Types |
-| 14 | ⬜ Not Started | Backend List & Card UI |
+| 14 | ✅ Complete | Backend List & Card UI |
 | 15 | ⬜ Not Started | Status Integration & Indicators |
 | 16 | ⬜ Not Started | Backend Form Fields |
 | 17 | ⬜ Not Started | CRUD Operations |
@@ -859,20 +859,23 @@ Established webapp foundation with:
 
 ---
 
-### Phase 14: Backend List & Card UI ⬜
+### Phase 14: Backend List & Card UI ✅
 
-**Goal**: Implement backend list display with collapsible card pattern.
+**Status**: Complete
+**Commits**: 8bd533f
 
-**Work**:
-- Create `BackendList.tsx` component rendering array of backends
-- Create `BackendCard.tsx` with collapsible card pattern (header + expand/collapse)
-- Card header shows: icon, backend name, type, enabled badge
-- Expand/collapse with chevron icon (similar to agents plugin bot cards)
-- Render "No backends configured" empty state
-- Pass backend data from props through to cards
-- Write component tests for list rendering, expand/collapse behavior
-
-**Completion Criteria**: Can view list of backends in collapsible cards, no status or editing yet, all tests and lint checks passing
+Implemented backend list and card UI with collapsible pattern:
+- **Reusable Components**:
+  - `buttons.tsx`: TertiaryButton, PrimaryButton, ButtonIcon, DestructiveButton
+  - `pill.tsx`: Status pill components (SuccessPill, WarningPill, DangerPill, GrayPill)
+  - `form_fields.tsx`: Form field components (TextItem, SelectionItem, BooleanItem, ItemList)
+- **Main Components**:
+  - `NoBackendsPage.tsx`: Empty state with centered layout and "Add Backend" action
+  - `BackendCard.tsx`: Collapsible card with header (icon, name, type, enabled badge) and expand/collapse behavior
+  - `BackendList.tsx`: Container mapping over backends array with "Add Backend" button generating UUIDs
+- **Integration**: Updated `index.tsx` to use BackendList and NoBackendsPage with onChange/setSaveNeeded
+- Comprehensive unit tests for all components (30/30 passing)
+- All tests and lint checks passing
 
 ---
 

@@ -85,8 +85,8 @@ func (p *Plugin) OnActivate() error {
 // OnDeactivate is invoked when the plugin is deactivated.
 func (p *Plugin) OnDeactivate() error {
 	if p.registry != nil {
-		if err := p.registry.StopAll(); err != nil {
-			p.API.LogError("Failed to stop all backends during deactivation", "error", err.Error())
+		if err := p.registry.UnregisterAll(); err != nil {
+			p.API.LogError("Failed to unregister all backends during deactivation", "error", err.Error())
 			return err
 		}
 	}

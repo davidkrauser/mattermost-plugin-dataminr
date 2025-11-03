@@ -47,22 +47,22 @@ func (r *Registry) Register(backend Backend) error {
 // The backend is always removed from the registry, even if Stop fails.
 func (r *Registry) Unregister(id string) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	backend, exists := r.backends[id]
 	if !exists {
+		r.mu.Unlock()
 		return fmt.Errorf("backend with ID %s not found", id)
 	}
 
-	// Stop the backend before removing it
-	var stopErr error
+	// Remove the backend from the registry first
+	delete(r.backends, id)
+	r.mu.Unlock()
+
+	// Stop the backend after releasing the lock to avoid blocking other registry operations
 	if err := backend.Stop(); err != nil {
-		stopErr = fmt.Errorf("failed to stop backend %s: %w", id, err)
+		return fmt.Errorf("failed to stop backend %s: %w", id, err)
 	}
 
-	// Always remove the backend, even if Stop failed
-	delete(r.backends, id)
-	return stopErr
+	return nil
 }
 
 // Get retrieves a backend by its ID.
@@ -88,19 +88,24 @@ func (r *Registry) List() []Backend {
 	return backends
 }
 
-// StopAll stops and removes all registered backends.
-// Returns the first error encountered, but continues stopping remaining backends.
-func (r *Registry) StopAll() error {
+// UnregisterAll unregisters and stops all registered backends.
+// Returns the first error encountered, but continues unregistering remaining backends.
+func (r *Registry) UnregisterAll() error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	var firstError error
-
+	// Get all backends and clear the registry
+	backends := make([]Backend, 0, len(r.backends))
 	for id, backend := range r.backends {
-		if err := backend.Stop(); err != nil && firstError == nil {
-			firstError = fmt.Errorf("failed to stop backend %s: %w", id, err)
-		}
+		backends = append(backends, backend)
 		delete(r.backends, id)
+	}
+	r.mu.Unlock()
+
+	// Stop all backends after releasing the lock
+	var firstError error
+	for _, backend := range backends {
+		if err := backend.Stop(); err != nil && firstError == nil {
+			firstError = fmt.Errorf("failed to stop backend %s: %w", backend.GetID(), err)
+		}
 	}
 
 	return firstError

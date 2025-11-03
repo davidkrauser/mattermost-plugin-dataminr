@@ -219,7 +219,7 @@ func TestRegistry_List(t *testing.T) {
 	assert.True(t, ids["backend3"])
 }
 
-func TestRegistry_StopAll(t *testing.T) {
+func TestRegistry_UnregisterAll(t *testing.T) {
 	registry := NewRegistry()
 
 	backend1 := newMockBackend("backend1", "Test Backend 1", "dataminr")
@@ -230,7 +230,7 @@ func TestRegistry_StopAll(t *testing.T) {
 	require.NoError(t, registry.Register(backend2))
 	require.NoError(t, registry.Register(backend3))
 
-	err := registry.StopAll()
+	err := registry.UnregisterAll()
 	assert.NoError(t, err)
 	assert.Equal(t, 0, registry.Count())
 
@@ -240,7 +240,7 @@ func TestRegistry_StopAll(t *testing.T) {
 	assert.True(t, backend3.isStopped())
 }
 
-func TestRegistry_StopAllWithErrors(t *testing.T) {
+func TestRegistry_UnregisterAllWithErrors(t *testing.T) {
 	registry := NewRegistry()
 
 	backend1 := newMockBackend("backend1", "Test Backend 1", "dataminr")
@@ -252,7 +252,7 @@ func TestRegistry_StopAllWithErrors(t *testing.T) {
 	require.NoError(t, registry.Register(backend2))
 	require.NoError(t, registry.Register(backend3))
 
-	err := registry.StopAll()
+	err := registry.UnregisterAll()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to stop backend")
 

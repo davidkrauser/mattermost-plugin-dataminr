@@ -37,7 +37,8 @@ describe('BackendForm', () => {
             />,
         );
 
-        expect(wrapper.find('TextItem')).toHaveLength(6); // name, url, apiId, apiKey, channelId, pollIntervalSeconds
+        expect(wrapper.find('TextItem')).toHaveLength(5); // name, url, apiId, apiKey, pollIntervalSeconds
+        expect(wrapper.find('ChannelSelector')).toHaveLength(1); // channel
         expect(wrapper.find('BooleanItem')).toHaveLength(1); // enabled
         expect(wrapper.find('SelectionItem')).toHaveLength(1); // type
     });
@@ -71,10 +72,10 @@ describe('BackendForm', () => {
         expect(apiKeyField.prop('value')).toBe('test-key');
         expect(apiKeyField.prop('type')).toBe('password');
 
-        const channelIdField = wrapper.find('TextItem').at(4);
-        expect(channelIdField.prop('value')).toBe('test-channel');
+        const channelSelector = wrapper.find('ChannelSelector');
+        expect(channelSelector.prop('channelId')).toBe('test-channel');
 
-        const pollIntervalField = wrapper.find('TextItem').at(5);
+        const pollIntervalField = wrapper.find('TextItem').at(4);
         expect(pollIntervalField.prop('value')).toBe('30');
         expect(pollIntervalField.prop('type')).toBe('number');
     });
@@ -247,7 +248,7 @@ describe('BackendForm', () => {
         );
 
         // Blur the poll interval field
-        const pollIntervalField = wrapper.find('TextItem').at(5);
+        const pollIntervalField = wrapper.find('TextItem').at(4);
         const onBlur = pollIntervalField.prop('onBlur');
         if (onBlur) {
             onBlur({} as any);
@@ -256,7 +257,7 @@ describe('BackendForm', () => {
         wrapper.update();
 
         // Check hasError prop is set for invalid poll interval
-        const pollIntervalFieldAfterBlur = wrapper.find('TextItem').at(5);
+        const pollIntervalFieldAfterBlur = wrapper.find('TextItem').at(4);
         expect(pollIntervalFieldAfterBlur.prop('hasError')).toBe(true);
     });
 
@@ -269,7 +270,7 @@ describe('BackendForm', () => {
             />,
         );
 
-        const pollIntervalField = wrapper.find('TextItem').at(5);
+        const pollIntervalField = wrapper.find('TextItem').at(4);
         pollIntervalField.prop('onChange')!({target: {value: '60'}} as any);
 
         expect(mockOnChange).toHaveBeenCalledWith({

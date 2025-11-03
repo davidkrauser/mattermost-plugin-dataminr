@@ -96,7 +96,7 @@ func TestFormatAlert_FullAlert(t *testing.T) {
 
 	// Field 8: Public Source (last field)
 	assert.Equal(t, "Public Source", attachment.Fields[8].Title)
-	assert.Equal(t, "[Public Source](https://example.com/source)", attachment.Fields[8].Value)
+	assert.Equal(t, "[Link](https://example.com/source)", attachment.Fields[8].Value)
 	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[8].Short)
 }
 

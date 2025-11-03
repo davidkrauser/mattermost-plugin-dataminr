@@ -2,6 +2,7 @@
 // See LICENSE.txt for license information.
 
 import {Client4 as Client4Class, ClientError} from '@mattermost/client';
+import type {ChannelWithTeamData} from '@mattermost/types/channels';
 
 import type {BackendStatus} from './components/admin_console/backend_settings/types';
 import manifest from './manifest';
@@ -31,4 +32,29 @@ export async function getBackendsStatus(): Promise<Record<string, BackendStatus>
         status_code: response.status,
         url,
     });
+}
+
+/**
+ * Search for channels across all teams
+ * @param term - Search term
+ * @returns Array of channels with team data
+ */
+export async function searchAllChannels(term: string): Promise<ChannelWithTeamData[]> {
+    return Client4.searchAllChannels(term, {
+        nonAdminSearch: false,
+        public: true,
+        private: true,
+        include_deleted: false,
+        deleted: false,
+    }) as Promise<ChannelWithTeamData[]>;
+}
+
+/**
+ * Get a channel by ID
+ * @param channelId - Channel ID
+ * @returns Channel with team data
+ */
+export async function getChannelById(channelId: string): Promise<ChannelWithTeamData> {
+    const channel = await Client4.getChannel(channelId);
+    return channel as unknown as ChannelWithTeamData;
 }

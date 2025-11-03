@@ -130,7 +130,12 @@ The `Backends` custom type requires a React component in the webapp that provide
   - Enabled toggle (per-backend enable/disable)
   - API URL (text input with HTTPS validation)
   - API credentials (apiId and apiKey text inputs, displayed as password fields)
-  - Target Mattermost channel (channel picker component)
+  - Target Mattermost channel (autocomplete selector using react-select/async)
+    - Searches all channels (public and private) across all teams
+    - Displays channel name with team name in parentheses
+    - Shows channel icon (🌐 for public, 🔒 for private)
+    - Implemented in `ChannelSelector.tsx`
+    - Uses Mattermost Client4 API for channel search and retrieval
   - Poll interval in seconds (number input, min: 10, default: 30)
 - **Actions**: Add, edit, delete, enable/disable toggle
 - **Real-time Status**: Periodically fetch backend status from `/api/v1/backends/status` endpoint (every 30 seconds) and merge with configuration data for display

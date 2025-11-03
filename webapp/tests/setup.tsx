@@ -19,4 +19,28 @@ if (typeof document === 'undefined') {
     global.window = jsdom.window as any;
 }
 
+// Mock @mattermost/client globally to prevent module resolution issues
+jest.mock('@mattermost/client', () => {
+    const mockGetOptions = jest.fn((opts) => opts);
+    return {
+        Client4: jest.fn().mockImplementation(() => ({
+            getOptions: mockGetOptions,
+            url: 'http://localhost:8065',
+            searchAllChannels: jest.fn(),
+            getChannel: jest.fn(),
+        })),
+        ClientError: class ClientError extends Error {
+            status_code: number;
+            url: string;
+
+            constructor(baseUrl: string, data: {message: string; status_code: number; url: string}) {
+                super(data.message);
+                this.status_code = data.status_code;
+                this.url = data.url;
+                this.name = 'ClientError';
+            }
+        },
+    };
+});
+
 export {};

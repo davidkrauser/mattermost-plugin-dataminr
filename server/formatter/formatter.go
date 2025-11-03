@@ -124,7 +124,7 @@ func FormatAlert(alert backend.Alert) *model.SlackAttachment {
 	if alert.PublicSourceURL != "" {
 		fields = append(fields, &model.SlackAttachmentField{
 			Title: "Public Source",
-			Value: fmt.Sprintf("[Public Source](%s)", alert.PublicSourceURL),
+			Value: fmt.Sprintf("[Link](%s)", alert.PublicSourceURL),
 			Short: false,
 		})
 	}

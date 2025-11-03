@@ -4,8 +4,9 @@
 import React, {useState, useEffect} from 'react';
 import styled from 'styled-components';
 
+import {ChannelSelector} from './ChannelSelector';
 import {DefaultPollIntervalSeconds, MinPollIntervalSeconds, SupportedBackendTypes} from './constants';
-import {BooleanItem, ItemList, SelectionItem, SelectionItemOption, TextItem} from './form_fields';
+import {BooleanItem, ItemLabel, ItemList, SelectionItem, SelectionItemOption, TextItem} from './form_fields';
 import type {BackendConfig, BackendDisplay} from './types';
 import {validateBackendConfig, type ValidationErrors} from './validation';
 
@@ -154,14 +155,13 @@ const BackendForm = (props: Props) => {
                 />
                 {getFieldError('apiKey') && <ErrorMessage>{getFieldError('apiKey')}</ErrorMessage>}
 
-                <TextItem
-                    label='Channel ID'
-                    value={props.backend.channelId}
-                    onChange={(e) => handleFieldChange('channelId', e.target.value)}
+                <ItemLabel>{'Channel'}</ItemLabel>
+                <ChannelSelector
+                    channelId={props.backend.channelId}
+                    onChangeChannelId={(channelId) => handleFieldChange('channelId', channelId)}
                     onBlur={() => handleFieldBlur('channelId')}
-                    placeholder='channel_id'
-                    helptext='Mattermost channel ID where alerts will be posted'
                     hasError={Boolean(getFieldError('channelId'))}
+                    helptext='Mattermost channel where alerts will be posted'
                 />
                 {getFieldError('channelId') && <ErrorMessage>{getFieldError('channelId')}</ErrorMessage>}
 

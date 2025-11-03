@@ -191,6 +191,10 @@ func TestDataminrBackend_FullIntegration(t *testing.T) {
 
 	// Test full poll cycle with mock scheduler
 	t.Run("full poll cycle", func(t *testing.T) {
+		// Set initial cursor to avoid catch-up mode
+		err := b.stateStore.SaveCursor("initial-cursor")
+		require.NoError(t, err)
+
 		// Set up mock scheduler that captures the callback
 		var pollCallback func()
 		mockScheduler := &MockJobScheduler{
@@ -202,7 +206,7 @@ func TestDataminrBackend_FullIntegration(t *testing.T) {
 		b.poller.SetScheduler(mockScheduler)
 
 		// Start the backend
-		err := b.Start()
+		err = b.Start()
 		require.NoError(t, err)
 		assert.True(t, b.running)
 
@@ -323,6 +327,10 @@ func TestDataminrBackend_ErrorHandling(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("handle API errors and track failures", func(t *testing.T) {
+		// Set initial cursor to avoid catch-up mode
+		err := b.stateStore.SaveCursor("initial-cursor")
+		require.NoError(t, err)
+
 		// Set up mock scheduler
 		var pollCallback func()
 		mockJob := &MockJob{}
@@ -335,7 +343,7 @@ func TestDataminrBackend_ErrorHandling(t *testing.T) {
 		b.poller.SetScheduler(mockScheduler)
 
 		// Start the backend
-		err := b.Start()
+		err = b.Start()
 		require.NoError(t, err)
 
 		// Trigger poll cycles that will fail

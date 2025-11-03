@@ -451,28 +451,26 @@ server/backend/
 ### 6.1 Formatting Requirements
 
 **Color Coding by Alert Type:**
-- **Flash**: Red (#FF0000) 🔴 - Breaking news, highest priority
-- **Urgent**: Orange (#FF9900) 🟠 - High priority
-- **Alert**: Yellow (#FFFF00) 🟡 - Normal priority
-- Unknown: Gray (#808080) ⚪
+- **Flash**: Red (#FF0000) - Breaking news, highest priority
+- **Urgent**: Orange (#FF9900) - High priority
+- **Alert**: Yellow (#FFFF00) - Normal priority
+- Unknown: Gray (#808080)
 
 **Mattermost Attachment Structure:**
-- Pretext: Emoji + Alert Type (uppercase)
-- Title: Alert headline (linked to AlertURL if available)
+- Text: Alert headline as markdown H4 header (linked to AlertURL if available)
 - Color: Alert type color
 - Fields (displayed in order):
-  - Alert Type + Event Time (side by side)
+  - Event Time (short field, side by side with Location)
+  - Location (address, coordinates, confidence radius) (short field, side by side with Event Time)
   - Additional Context (sub-headline if available)
-  - Location (address, coordinates, confidence radius)
-  - Topics (bulleted list, short field)
-  - Alert Lists (bulleted list, short field)
-  - Related Alerts count (if linked alerts exist)
-  - Public Source link
   - Original Source Text (truncate at 500 chars)
   - Translated Text (truncate at 500 chars)
+  - Topics (bulleted list, full width)
+  - Alert Lists (bulleted list, full width)
   - Additional Media (links to media 2-4)
+  - Public Source link (last field)
 - ImageURL: First media item embedded
-- Footer: Backend name + Alert ID
+- Footer: Backend name + Alert Type
 
 ---
 

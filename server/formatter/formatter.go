@@ -31,14 +31,11 @@ const (
 func FormatAlert(alert backend.Alert) *model.SlackAttachment {
 	attachment := &model.SlackAttachment{}
 
-	// Set pretext: Emoji + Alert Type (uppercase)
-	emoji := getAlertEmoji(alert.AlertType)
-	attachment.Pretext = fmt.Sprintf("%s %s", emoji, strings.ToUpper(alert.AlertType))
-
-	// Set title with optional link
-	attachment.Title = alert.Headline
+	// Set text with title (with optional link) - use markdown H4 header for emphasis
 	if alert.AlertURL != "" {
-		attachment.TitleLink = alert.AlertURL
+		attachment.Text = fmt.Sprintf("#### [%s](%s)", alert.Headline, alert.AlertURL)
+	} else {
+		attachment.Text = fmt.Sprintf("#### %s", alert.Headline)
 	}
 
 	// Set color based on alert type
@@ -47,19 +44,23 @@ func FormatAlert(alert backend.Alert) *model.SlackAttachment {
 	// Build fields in order
 	var fields []*model.SlackAttachmentField
 
-	// 1. Alert Type + Event Time (side by side)
+	// 1. Event Time + Location (side by side)
 	fields = append(fields,
-		&model.SlackAttachmentField{
-			Title: "Alert Type",
-			Value: alert.AlertType,
-			Short: true,
-		},
 		&model.SlackAttachmentField{
 			Title: "Event Time",
 			Value: formatTime(alert.EventTime),
 			Short: true,
 		},
 	)
+
+	// Location next to Event Time
+	if alert.Location != nil && alert.Location.Address != "" {
+		fields = append(fields, &model.SlackAttachmentField{
+			Title: "Location",
+			Value: formatLocation(alert.Location),
+			Short: true,
+		})
+	}
 
 	// 2. Additional Context (sub-headline if available)
 	if alert.SubHeadline != "" {
@@ -70,52 +71,7 @@ func FormatAlert(alert backend.Alert) *model.SlackAttachment {
 		})
 	}
 
-	// 3. Location (address, coordinates, confidence radius)
-	if alert.Location != nil && alert.Location.Address != "" {
-		fields = append(fields, &model.SlackAttachmentField{
-			Title: "Location",
-			Value: formatLocation(alert.Location),
-			Short: false,
-		})
-	}
-
-	// 4. Topics (bulleted list, short field)
-	if len(alert.Topics) > 0 {
-		fields = append(fields, &model.SlackAttachmentField{
-			Title: "Topics",
-			Value: formatBulletList(alert.Topics),
-			Short: true,
-		})
-	}
-
-	// 5. Alert Lists (bulleted list, short field)
-	if len(alert.AlertLists) > 0 {
-		fields = append(fields, &model.SlackAttachmentField{
-			Title: "Alert Lists",
-			Value: formatBulletList(alert.AlertLists),
-			Short: true,
-		})
-	}
-
-	// 6. Related Alerts count (if linked alerts exist)
-	if len(alert.LinkedAlerts) > 0 {
-		fields = append(fields, &model.SlackAttachmentField{
-			Title: "Related Alerts",
-			Value: fmt.Sprintf("%d linked alert(s)", len(alert.LinkedAlerts)),
-			Short: false,
-		})
-	}
-
-	// 7. Public Source link
-	if alert.PublicSourceURL != "" {
-		fields = append(fields, &model.SlackAttachmentField{
-			Title: "Public Source",
-			Value: fmt.Sprintf("[View Source](%s)", alert.PublicSourceURL),
-			Short: false,
-		})
-	}
-
-	// 8. Original Source Text (truncate at 500 chars)
+	// 3. Original Source Text (truncate at 500 chars)
 	if alert.SourceText != "" {
 		fields = append(fields, &model.SlackAttachmentField{
 			Title: "Original Source Text",
@@ -124,7 +80,7 @@ func FormatAlert(alert backend.Alert) *model.SlackAttachment {
 		})
 	}
 
-	// 9. Translated Text (truncate at 500 chars)
+	// 4. Translated Text (truncate at 500 chars)
 	if alert.TranslatedText != "" {
 		fields = append(fields, &model.SlackAttachmentField{
 			Title: "Translated Text",
@@ -133,7 +89,25 @@ func FormatAlert(alert backend.Alert) *model.SlackAttachment {
 		})
 	}
 
-	// 10. Additional Media (links to media 2-4)
+	// 5. Topics (bulleted list, full width)
+	if len(alert.Topics) > 0 {
+		fields = append(fields, &model.SlackAttachmentField{
+			Title: "Topics",
+			Value: formatBulletList(alert.Topics),
+			Short: false,
+		})
+	}
+
+	// 6. Alert Lists (bulleted list, full width)
+	if len(alert.AlertLists) > 0 {
+		fields = append(fields, &model.SlackAttachmentField{
+			Title: "Alert Lists",
+			Value: formatBulletList(alert.AlertLists),
+			Short: false,
+		})
+	}
+
+	// 7. Additional Media (links to media 2-4)
 	if len(alert.MediaURLs) > 1 {
 		additionalMedia := alert.MediaURLs[1:]
 		if len(additionalMedia) > 3 {
@@ -146,6 +120,15 @@ func FormatAlert(alert backend.Alert) *model.SlackAttachment {
 		})
 	}
 
+	// 8. Public Source link (last field)
+	if alert.PublicSourceURL != "" {
+		fields = append(fields, &model.SlackAttachmentField{
+			Title: "Public Source",
+			Value: fmt.Sprintf("[Public Source](%s)", alert.PublicSourceURL),
+			Short: false,
+		})
+	}
+
 	attachment.Fields = fields
 
 	// Set image URL: First media item embedded
@@ -153,8 +136,8 @@ func FormatAlert(alert backend.Alert) *model.SlackAttachment {
 		attachment.ImageURL = alert.MediaURLs[0]
 	}
 
-	// Set footer: Backend name + Alert ID
-	attachment.Footer = fmt.Sprintf("%s | Alert ID: %s", alert.BackendName, alert.AlertID)
+	// Set footer: Backend name + Alert Type
+	attachment.Footer = fmt.Sprintf("%s | %s", alert.BackendName, alert.AlertType)
 
 	return attachment
 }

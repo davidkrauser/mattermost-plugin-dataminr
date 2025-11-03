@@ -1,7 +1,7 @@
 // Copyright (c) 2023-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import styled from 'styled-components';
 
 import {TrashCanOutlineIcon, ChevronDownIcon, ChevronUpIcon, AlertOutlineIcon} from '@mattermost/compass-icons/components';
@@ -11,6 +11,7 @@ import {ButtonIcon} from './buttons';
 import ConfirmationDialog from './ConfirmationDialog';
 import {GrayPill, SuccessPill, WarningPill, DangerPill} from './pill';
 import type {BackendConfig, BackendDisplay, StatusIndicator} from './types';
+import {StatusIndicator as StatusIndicatorEnum} from './types';
 import type {ValidationErrors} from './validation';
 
 type Props = {
@@ -48,6 +49,7 @@ const StatusPill = ({indicator, status}: {indicator: StatusIndicator; status?: B
 const BackendCard = (props: Props) => {
     const [open, setOpen] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [statusOverride, setStatusOverride] = useState<StatusIndicator | null>(null);
 
     const handleDeleteClick = (e: React.MouseEvent<HTMLButtonElement>) => {
         e.stopPropagation();
@@ -59,13 +61,29 @@ const BackendCard = (props: Props) => {
         setShowDeleteConfirm(false);
     };
 
+    const handleChange = (backend: BackendConfig) => {
+        // If backend was just re-enabled, override status to Unknown until next status poll
+        if (backend.enabled && !props.backend.enabled) {
+            setStatusOverride(StatusIndicatorEnum.Unknown);
+        }
+        props.onChange(backend);
+    };
+
+    // Clear status override when we get fresh status data showing backend is enabled
+    // This means the server has processed the re-enable and we can trust the status
+    useEffect(() => {
+        if (statusOverride !== null && props.backend.status && props.backend.status.enabled) {
+            setStatusOverride(null);
+        }
+    }, [statusOverride, props.backend.status]);
+
     const hasValidationErrors = props.validationErrors && Object.keys(props.validationErrors).length > 0;
+    const displayIndicator = statusOverride ?? props.backend.statusIndicator;
 
     return (
         <>
             <BackendContainer>
                 <HeaderContainer onClick={() => setOpen((o) => !o)}>
-                    <StyledAlertIcon $hasError={hasValidationErrors}/>
                     <Title>
                         <NameText>
                             {props.backend.name || '(Unnamed Backend)'}
@@ -75,11 +93,14 @@ const BackendCard = (props: Props) => {
                             {props.backend.type}
                         </TypeText>
                     </Title>
+                    {hasValidationErrors && <StyledAlertIcon/>}
                     <Spacer/>
-                    <StatusPill
-                        indicator={props.backend.statusIndicator}
-                        status={props.backend.status}
-                    />
+                    {displayIndicator !== StatusIndicatorEnum.Unknown && (
+                        <StatusPill
+                            indicator={displayIndicator}
+                            status={props.backend.status}
+                        />
+                    )}
                     <ButtonIcon onClick={handleDeleteClick}>
                         <TrashIcon/>
                     </ButtonIcon>
@@ -99,11 +120,10 @@ const BackendCard = (props: Props) => {
                                 </ErrorList>
                             </ErrorBanner>
                         )}
-                        <SectionTitle>{'Configuration'}</SectionTitle>
                         <BackendForm
                             backend={props.backend}
                             allBackends={props.allBackends}
-                            onChange={props.onChange}
+                            onChange={handleChange}
                         />
                     </ContentContainer>
                 )}
@@ -152,10 +172,10 @@ const HeaderContainer = styled.div`
     }
 `;
 
-const StyledAlertIcon = styled(AlertOutlineIcon)<{$hasError?: boolean}>`
+const StyledAlertIcon = styled(AlertOutlineIcon)`
     width: 24px;
     height: 24px;
-    color: ${(props) => (props.$hasError ? 'var(--error-text)' : 'rgba(var(--center-channel-color-rgb), 0.56)')};
+    color: var(--error-text);
 `;
 
 const Title = styled.div`
@@ -194,14 +214,6 @@ const VerticalDivider = styled.div`
 
 const ContentContainer = styled.div`
     padding: 24px 20px;
-`;
-
-const SectionTitle = styled.div`
-    font-size: 14px;
-    font-weight: 600;
-    margin-top: 16px;
-    margin-bottom: 12px;
-    color: rgba(var(--center-channel-color-rgb), 0.72);
 `;
 
 const ErrorBanner = styled.div`

@@ -1,23 +1,59 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import styled from 'styled-components';
 
 import {DefaultPollIntervalSeconds, MinPollIntervalSeconds, SupportedBackendTypes} from './constants';
 import {BooleanItem, ItemList, SelectionItem, SelectionItemOption, TextItem} from './form_fields';
-import type {BackendConfig} from './types';
+import type {BackendConfig, BackendDisplay} from './types';
 import {validateBackendConfig, type ValidationErrors} from './validation';
 
 type Props = {
-    backend: BackendConfig;
+    backend: BackendDisplay;
     allBackends: BackendConfig[];
     onChange: (backend: BackendConfig) => void;
+};
+
+// Helper to determine if backend was auto-disabled by server
+const isAutoDisabledByServer = (backend: BackendDisplay): boolean => {
+    return Boolean(backend.status &&
+                   backend.status.enabled === false &&
+                   (backend.status.consecutiveFailures > 0 || backend.status.lastError));
 };
 
 const BackendForm = (props: Props) => {
     const [errors, setErrors] = useState<ValidationErrors>({});
     const [touchedFields, setTouchedFields] = useState<Set<keyof BackendConfig>>(new Set());
+
+    // Track if backend was auto-disabled by the server
+    const wasAutoDisabledByServer = isAutoDisabledByServer(props.backend);
+
+    // Initialize sync flag based on current state
+    // If already auto-disabled on mount, mark it as synced so we don't override user re-enable attempts
+    const [serverDisableAlreadySynced, setServerDisableAlreadySynced] = useState(() => {
+        return isAutoDisabledByServer(props.backend) && !props.backend.enabled;
+    });
+
+    // Sync form field when backend is auto-disabled by server (only once)
+    // Only update if form shows enabled but server says disabled
+    useEffect(() => {
+        if (wasAutoDisabledByServer && props.backend.enabled && !serverDisableAlreadySynced) {
+            const updatedBackend = {...props.backend, enabled: false};
+            props.onChange(updatedBackend);
+            setServerDisableAlreadySynced(true);
+        }
+    }, [wasAutoDisabledByServer, props.backend.enabled, serverDisableAlreadySynced]);
+
+    // Reset the sync flag when backend is re-enabled and status is cleared or shows enabled
+    useEffect(() => {
+        if (props.backend.enabled && serverDisableAlreadySynced) {
+            // If status is cleared (undefined) or shows enabled, reset the flag
+            if (!props.backend.status || props.backend.status.enabled === true) {
+                setServerDisableAlreadySynced(false);
+            }
+        }
+    }, [props.backend.enabled, props.backend.status, serverDisableAlreadySynced]);
 
     const handleFieldChange = (field: keyof BackendConfig, value: any) => {
         const updatedBackend = {...props.backend, [field]: value};
@@ -61,6 +97,11 @@ const BackendForm = (props: Props) => {
                     onChange={(value) => handleFieldChange('enabled', value)}
                     helpText='Whether this backend is active and polling for alerts'
                 />
+                {wasAutoDisabledByServer && !props.backend.enabled && (
+                    <ErrorMessage>
+                        {'This backend was automatically disabled due to consecutive failures. Please check the configuration and re-enable when ready.'}
+                    </ErrorMessage>
+                )}
 
                 <SelectionItem
                     label='Type'

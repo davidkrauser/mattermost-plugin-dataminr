@@ -122,8 +122,8 @@ describe('BackendCard', () => {
         expect(errorBackend.statusIndicator).toBe(StatusIndicator.Error);
     });
 
-    it('should show status pill for unknown status', () => {
-        shallow(
+    it('should not show status pill for unknown status', () => {
+        const wrapper = shallow(
             <BackendCard
                 backend={mockBackend}
                 allBackends={[mockBackend]}
@@ -134,6 +134,9 @@ describe('BackendCard', () => {
 
         // Check that backend has unknown status indicator
         expect(mockBackend.statusIndicator).toBe(StatusIndicator.Unknown);
+
+        // But status pill should not be rendered
+        expect(wrapper.find('StatusPill').exists()).toBe(false);
     });
 
     it('should be collapsed by default', () => {
@@ -171,7 +174,7 @@ describe('BackendCard', () => {
         wrapper.update();
         expect(wrapper.find(ChevronUpIcon)).toHaveLength(1);
         expect(wrapper.find(ChevronDownIcon)).toHaveLength(0);
-        expect(wrapper.text()).toContain('Configuration');
+        expect(wrapper.find('BackendForm')).toHaveLength(1);
     });
 
     it('should collapse when header is clicked again', () => {
@@ -285,7 +288,6 @@ describe('BackendCard', () => {
         // Check BackendForm is rendered
         wrapper.update();
         expect(wrapper.find('BackendForm')).toHaveLength(1);
-        expect(wrapper.text()).toContain('Configuration');
     });
 
     it('should display last success time in tooltip for active status', () => {
@@ -354,7 +356,7 @@ describe('BackendCard', () => {
         expect(statusPill.prop('indicator')).toBe(StatusIndicator.Error);
     });
 
-    it('should not display tooltip when status is unavailable', () => {
+    it('should not display status pill when status is unknown', () => {
         const wrapper = shallow(
             <BackendCard
                 backend={mockBackend}
@@ -364,11 +366,9 @@ describe('BackendCard', () => {
             />,
         );
 
-        // Check status prop is undefined
+        // Check that StatusPill is not rendered for Unknown status
         const statusPill = wrapper.find('StatusPill');
-        expect(statusPill.exists()).toBe(true);
-        expect(statusPill.prop('status')).toBeUndefined();
-        expect(statusPill.prop('indicator')).toBe(StatusIndicator.Unknown);
+        expect(statusPill.exists()).toBe(false);
     });
 
     it('should display validation errors when present', () => {

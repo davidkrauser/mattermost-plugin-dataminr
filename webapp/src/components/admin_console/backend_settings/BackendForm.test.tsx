@@ -5,10 +5,11 @@ import {shallow} from 'enzyme';
 import React from 'react';
 
 import BackendForm from './BackendForm';
-import type {BackendConfig} from './types';
+import type {BackendConfig, BackendDisplay} from './types';
+import {StatusIndicator} from './types';
 
 describe('BackendForm', () => {
-    const validBackend: BackendConfig = {
+    const validBackend: BackendDisplay = {
         id: '550e8400-e29b-41d4-a716-446655440000',
         name: 'Test Backend',
         type: 'dataminr',
@@ -18,6 +19,7 @@ describe('BackendForm', () => {
         apiKey: 'test-key',
         channelId: 'test-channel',
         pollIntervalSeconds: 30,
+        statusIndicator: StatusIndicator.Unknown,
     };
 
     const mockOnChange = jest.fn();
@@ -134,7 +136,7 @@ describe('BackendForm', () => {
     });
 
     it('should show error after blur on invalid field', () => {
-        const invalidBackend: BackendConfig = {
+        const invalidBackend: BackendDisplay = {
             ...validBackend,
             name: '', // Invalid: empty name
         };
@@ -164,12 +166,18 @@ describe('BackendForm', () => {
 
     it('should show error for duplicate name', () => {
         const existingBackend: BackendConfig = {
-            ...validBackend,
             id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
             name: 'Duplicate Name',
+            type: 'dataminr',
+            enabled: true,
+            url: 'https://api.example.com',
+            apiId: 'test-id',
+            apiKey: 'test-key',
+            channelId: 'test-channel',
+            pollIntervalSeconds: 30,
         };
 
-        const currentBackend: BackendConfig = {
+        const currentBackend: BackendDisplay = {
             ...validBackend,
             name: 'Duplicate Name',
         };
@@ -197,7 +205,7 @@ describe('BackendForm', () => {
     });
 
     it('should show error for non-HTTPS URL', () => {
-        const invalidBackend: BackendConfig = {
+        const invalidBackend: BackendDisplay = {
             ...validBackend,
             url: 'http://api.example.com', // Invalid: HTTP not HTTPS
         };
@@ -225,7 +233,7 @@ describe('BackendForm', () => {
     });
 
     it('should show error for invalid poll interval', () => {
-        const invalidBackend: BackendConfig = {
+        const invalidBackend: BackendDisplay = {
             ...validBackend,
             pollIntervalSeconds: 5, // Invalid: below minimum of 10
         };
@@ -271,7 +279,7 @@ describe('BackendForm', () => {
     });
 
     it('should show multiple errors for multiple invalid fields', () => {
-        const invalidBackend: BackendConfig = {
+        const invalidBackend: BackendDisplay = {
             id: '550e8400-e29b-41d4-a716-446655440000',
             name: '',
             type: 'dataminr',
@@ -281,6 +289,7 @@ describe('BackendForm', () => {
             apiKey: '',
             channelId: '',
             pollIntervalSeconds: 5,
+            statusIndicator: StatusIndicator.Unknown,
         };
 
         const wrapper = shallow(

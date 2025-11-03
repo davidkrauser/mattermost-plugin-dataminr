@@ -3,7 +3,7 @@
 
 import styled from 'styled-components';
 
-export const Pill = styled.div`
+export const Pill = styled.div<{title?: string}>`
     background: var(--button-bg, #1c58d9);
     color: white;
     border-radius: 4px;
@@ -15,6 +15,7 @@ export const Pill = styled.div`
     align-items: center;
     gap: 6px;
     text-transform: uppercase;
+    cursor: ${(props) => (props.title ? 'help' : 'default')};
 `;
 
 export const DangerPill = styled(Pill)`

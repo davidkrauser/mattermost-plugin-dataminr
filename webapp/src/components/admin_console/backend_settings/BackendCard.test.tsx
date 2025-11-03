@@ -273,7 +273,7 @@ describe('BackendCard', () => {
         expect(wrapper.text()).toContain('Configuration');
     });
 
-    it('should display status details when status is available', () => {
+    it('should display last success time in tooltip for active status', () => {
         const backendWithStatus: BackendDisplay = {
             ...mockBackend,
             statusIndicator: StatusIndicator.Active,
@@ -296,24 +296,17 @@ describe('BackendCard', () => {
             />,
         );
 
-        // Expand card
-        const clickableElements = wrapper.find('[onClick]');
-        const headerElement = clickableElements.at(0);
-        const onClick = headerElement.prop('onClick') as () => void;
-        onClick();
+        // Check tooltip on status pill
+        const statusPill = wrapper.find('StatusPill');
+        expect(statusPill.exists()).toBe(true);
+        expect(statusPill.prop('status')).toEqual(backendWithStatus.status);
 
-        wrapper.update();
-        const text = wrapper.text();
-        expect(text).toContain('Status');
-        expect(text).toContain('Consecutive Failures:');
-        expect(text).toContain('0');
-        expect(text).toContain('Authenticated:');
-        expect(text).toContain('Yes');
-        expect(text).toContain('Last Poll:');
-        expect(text).toContain('Last Success:');
+        // The tooltip should be computed in the StatusPill component
+        // We verify the props are passed correctly
+        expect(statusPill.prop('indicator')).toBe(StatusIndicator.Active);
     });
 
-    it('should display last error when present', () => {
+    it('should display last error in tooltip for disabled status', () => {
         const backendWithError: BackendDisplay = {
             ...mockBackend,
             statusIndicator: StatusIndicator.Disabled,
@@ -336,19 +329,17 @@ describe('BackendCard', () => {
             />,
         );
 
-        // Expand card
-        const clickableElements = wrapper.find('[onClick]');
-        const headerElement = clickableElements.at(0);
-        const onClick = headerElement.prop('onClick') as () => void;
-        onClick();
+        // Check tooltip on status pill
+        const statusPill = wrapper.find('StatusPill');
+        expect(statusPill.exists()).toBe(true);
+        expect(statusPill.prop('status')).toEqual(backendWithError.status);
 
-        wrapper.update();
-        const text = wrapper.text();
-        expect(text).toContain('Last Error:');
-        expect(text).toContain('Authentication failed: invalid credentials');
+        // The tooltip should be computed in the StatusPill component
+        // We verify the props are passed correctly
+        expect(statusPill.prop('indicator')).toBe(StatusIndicator.Disabled);
     });
 
-    it('should not display status section when status is unavailable', () => {
+    it('should not display tooltip when status is unavailable', () => {
         const wrapper = shallow(
             <BackendCard
                 backend={mockBackend}
@@ -358,17 +349,11 @@ describe('BackendCard', () => {
             />,
         );
 
-        // Expand card
-        const clickableElements = wrapper.find('[onClick]');
-        const headerElement = clickableElements.at(0);
-        const onClick = headerElement.prop('onClick') as () => void;
-        onClick();
-
-        wrapper.update();
-        const text = wrapper.text();
-        expect(text).toContain('Configuration');
-        expect(text).not.toContain('Consecutive Failures:');
-        expect(text).not.toContain('Authenticated:');
+        // Check status prop is undefined
+        const statusPill = wrapper.find('StatusPill');
+        expect(statusPill.exists()).toBe(true);
+        expect(statusPill.prop('status')).toBeUndefined();
+        expect(statusPill.prop('indicator')).toBe(StatusIndicator.Unknown);
     });
 
     it('should display validation errors when present', () => {

@@ -21,14 +21,22 @@ type Props = {
     validationErrors?: ValidationErrors;
 };
 
-const StatusPill = ({indicator}: {indicator: StatusIndicator}) => {
+const StatusPill = ({indicator, status}: {indicator: StatusIndicator; status?: BackendDisplay['status']}) => {
+    let tooltip: string | undefined;
+
+    if (indicator === 'active' && status?.lastSuccessTime) {
+        tooltip = `Last successful poll: ${new Date(status.lastSuccessTime).toLocaleString()}`;
+    } else if ((indicator === 'warning' || indicator === 'disabled') && status?.lastError) {
+        tooltip = status.lastError;
+    }
+
     switch (indicator) {
     case 'active':
-        return <SuccessPill>{'ACTIVE'}</SuccessPill>;
+        return <SuccessPill title={tooltip}>{'ACTIVE'}</SuccessPill>;
     case 'warning':
-        return <WarningPill>{'WARNING'}</WarningPill>;
+        return <WarningPill title={tooltip}>{'WARNING'}</WarningPill>;
     case 'disabled':
-        return <DangerPill>{'DISABLED'}</DangerPill>;
+        return <DangerPill title={tooltip}>{'DISABLED'}</DangerPill>;
     case 'unknown':
     default:
         return <GrayPill>{'UNKNOWN'}</GrayPill>;
@@ -66,7 +74,10 @@ const BackendCard = (props: Props) => {
                         </TypeText>
                     </Title>
                     <Spacer/>
-                    <StatusPill indicator={props.backend.statusIndicator}/>
+                    <StatusPill
+                        indicator={props.backend.statusIndicator}
+                        status={props.backend.status}
+                    />
                     <ButtonIcon onClick={handleDeleteClick}>
                         <TrashIcon/>
                     </ButtonIcon>
@@ -92,36 +103,6 @@ const BackendCard = (props: Props) => {
                             allBackends={props.allBackends}
                             onChange={props.onChange}
                         />
-
-                        {props.backend.status && (
-                            <>
-                                <SectionTitle>{'Status'}</SectionTitle>
-                                <InfoList>
-                                    <InfoItem>
-                                        <strong>{'Consecutive Failures:'}</strong> {props.backend.status.consecutiveFailures}
-                                    </InfoItem>
-                                    <InfoItem>
-                                        <strong>{'Authenticated:'}</strong> {props.backend.status.isAuthenticated ? 'Yes' : 'No'}
-                                    </InfoItem>
-                                    {props.backend.status.lastPollTime && (
-                                        <InfoItem>
-                                            <strong>{'Last Poll:'}</strong> {new Date(props.backend.status.lastPollTime).toLocaleString()}
-                                        </InfoItem>
-                                    )}
-                                    {props.backend.status.lastSuccessTime && (
-                                        <InfoItem>
-                                            <strong>{'Last Success:'}</strong> {new Date(props.backend.status.lastSuccessTime).toLocaleString()}
-                                        </InfoItem>
-                                    )}
-                                    {props.backend.status.lastError && (
-                                        <InfoItem>
-                                            <ErrorLabel>{'Last Error:'}</ErrorLabel>
-                                            <ErrorText>{props.backend.status.lastError}</ErrorText>
-                                        </InfoItem>
-                                    )}
-                                </InfoList>
-                            </>
-                        )}
                     </ContentContainer>
                 )}
             </BackendContainer>
@@ -213,32 +194,12 @@ const ContentContainer = styled.div`
     padding: 24px 20px;
 `;
 
-const InfoList = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-`;
-
-const InfoItem = styled.div`
-    font-size: 13px;
-    line-height: 20px;
-`;
-
 const SectionTitle = styled.div`
     font-size: 14px;
     font-weight: 600;
     margin-top: 16px;
     margin-bottom: 12px;
     color: rgba(var(--center-channel-color-rgb), 0.72);
-`;
-
-const ErrorLabel = styled.strong`
-    color: var(--error-text);
-`;
-
-const ErrorText = styled.span`
-    color: var(--error-text);
-    word-break: break-word;
 `;
 
 const ErrorBanner = styled.div`

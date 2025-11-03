@@ -1,8 +1,8 @@
 # Mattermost Dataminr Plugin - Technical Specification
 
-**Version:** 1.0
-**Date:** 2025-10-29
-**Status:** Initial Specification
+**Version:** 1.1
+**Date:** 2025-11-03
+**Status:** Active Development
 
 ---
 
@@ -389,10 +389,17 @@ server/backend/
 **Poller (`poller.go`):**
 - **CRITICAL**: Must use Mattermost's cluster plugin scheduled job system (plugin API's `PluginAPI.Jobs.CreateJob()` and job callback registration)
 - This ensures only ONE server instance polls each backend in a multi-server cluster deployment
-- 30-second polling cycle
-- Poll immediately on start (via initial job scheduling)
-- Load cursor from state → poll API → process alerts → save cursor
-- Graceful shutdown by canceling scheduled jobs
+- 30-second polling cycle for regular operation
+- **Catch-Up Mechanism**: When no cursor exists (first time setup):
+  - Runs background goroutine that polls every 5 seconds
+  - Skips posting alerts older than 24 hours
+  - Stops when first alert within 24 hours is found
+  - Saves cursor after each API call for crash recovery
+  - Then starts regular polling job
+  - Cancellable via context (Stop() cancels cleanly)
+  - Disables backend on errors (same as regular polling)
+- Regular polling: Load cursor from state → poll API → process alerts → save cursor
+- Graceful shutdown by canceling scheduled jobs and catch-up routine
 - Each backend registers its own unique job with a backend-specific job ID
 
 **Alert Processing (`adapter.go`, `deduplicator.go`, `processor.go`):**
@@ -979,3 +986,49 @@ After all phases complete:
 ---
 
 **End of Implementation Plan**
+
+---
+
+## Post-Implementation Updates
+
+This section documents enhancements and fixes made after the initial implementation was completed.
+
+### 2025-11-03: Historical Alert Catch-Up Feature
+
+**Problem**: When a new Dataminr backend was added without a cursor, the first API call would return all historical alerts going back days. This caused hundreds or thousands of old alerts to flood the Mattermost channel, creating a poor user experience.
+
+**Solution**: Implemented an intelligent catch-up mechanism that runs when no cursor exists (first time setup):
+
+**Implementation Details**:
+- **Detection**: `Start()` checks if cursor exists; if empty, launches catch-up routine
+- **Catch-Up Process**:
+  - Runs in background goroutine (non-blocking)
+  - Polls API every 5 seconds (respects rate limits, 12 requests/minute max)
+  - Fetches historical alerts but does NOT post them
+  - Filters by event time: skips alerts older than 24 hours
+  - Stops when encountering first alert within 24 hours window
+  - Saves cursor after each successful API call (crash recovery)
+  - Then transitions to regular 30-second polling job
+- **Error Handling**: Same as regular polling - disables backend after MaxConsecutiveFailures
+- **Cancellation**: Context-based cancellation via `Stop()` method
+- **State Management**: Uses existing KV store, no new state keys required
+
+**Code Changes**:
+- `server/backend/dataminr/poller.go`:
+  - Added `catchUpCancel` field (context.CancelFunc)
+  - Modified `Start()` to check cursor and launch catch-up
+  - Added `catchUp(ctx)` method with 24-hour filtering logic
+  - Added `startRegularJob()` helper for shared job startup code
+  - Updated `Stop()` to cancel catch-up routine
+- Test updates:
+  - Added 5 new comprehensive tests for catch-up behavior
+  - Updated existing tests to mock cursor state (avoid catch-up in tests)
+
+**Benefits**:
+- ✅ Prevents channel flooding with historical alerts
+- ✅ Only shows recent alerts (within 24 hours) on first setup
+- ✅ Automatic and transparent - no admin intervention needed
+- ✅ Crash-safe with progressive cursor saves
+- ✅ Rate-limit friendly with 5-second intervals
+
+**Commit**: 1b526e8

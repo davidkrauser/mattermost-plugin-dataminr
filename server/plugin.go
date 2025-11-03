@@ -112,6 +112,13 @@ func (p *Plugin) createAndStartBackend(config backend.Config) {
 
 	// Only start the backend if it's enabled
 	if !config.Enabled {
+		// Clear cursor and auth token for disabled backends to ensure fresh start when re-enabled
+		// This preserves failure tracking state for status display
+		if err := b.ClearOperationalState(); err != nil {
+			p.API.LogWarn("Failed to clear operational state for disabled backend", "id", config.ID, "name", config.Name, "error", err.Error())
+		} else {
+			p.API.LogInfo("Cleared operational state for disabled backend", "id", config.ID, "name", config.Name)
+		}
 		p.API.LogInfo("Backend registered but not started (disabled)", "id", config.ID, "name", config.Name)
 		return
 	}

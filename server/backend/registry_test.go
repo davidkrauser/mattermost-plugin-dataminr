@@ -67,6 +67,12 @@ func (m *mockBackend) GetStatus() Status {
 	return Status{}
 }
 
+func (m *mockBackend) ClearOperationalState() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return nil
+}
+
 func (m *mockBackend) isStopped() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()

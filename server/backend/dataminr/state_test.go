@@ -244,6 +244,28 @@ func TestStateStore_Failures(t *testing.T) {
 	})
 }
 
+func TestStateStore_ClearOperationalState(t *testing.T) {
+	t.Run("clears only cursor and auth token", func(t *testing.T) {
+		api := &plugintest.API{}
+		backendID := "test-backend-xyz"
+		store := NewStateStore(api, backendID)
+
+		// Should only delete cursor and auth, not failure tracking state
+		expectedKeys := []string{
+			"backend_test-backend-xyz_auth",
+			"backend_test-backend-xyz_cursor",
+		}
+
+		for _, key := range expectedKeys {
+			api.On("KVDelete", key).Return(nil)
+		}
+
+		err := store.ClearOperationalState()
+		require.NoError(t, err)
+		api.AssertExpectations(t)
+	})
+}
+
 func TestStateStore_ClearAll(t *testing.T) {
 	t.Run("clears all state keys", func(t *testing.T) {
 		api := &plugintest.API{}

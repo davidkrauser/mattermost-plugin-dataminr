@@ -226,3 +226,9 @@ func (b *Backend) GetStatus() backend.Status {
 
 	return status
 }
+
+// ClearOperationalState removes cursor and auth token state while preserving
+// failure tracking for status display
+func (b *Backend) ClearOperationalState() error {
+	return b.stateStore.ClearOperationalState()
+}

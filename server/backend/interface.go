@@ -28,4 +28,10 @@ type Backend interface {
 	// GetStatus returns the current operational status of the backend.
 	// This includes health information, failure counts, and authentication state.
 	GetStatus() Status
+
+	// ClearOperationalState removes cursor and auth token state.
+	// This is called when a disabled backend is registered to ensure a fresh
+	// start when eventually re-enabled, while preserving failure tracking for display.
+	// Returns an error if state cannot be cleared.
+	ClearOperationalState() error
 }

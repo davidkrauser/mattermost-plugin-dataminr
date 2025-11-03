@@ -8,6 +8,16 @@ import (
 	"github.com/mattermost/mattermost/server/public/plugin"
 )
 
+// KV store key format strings
+const (
+	kvKeyAuthToken   = "backend_%s_auth"         //nolint:gosec // False positive: this is a key name format, not a credential
+	kvKeyCursor      = "backend_%s_cursor"       //nolint:gosec
+	kvKeyLastPoll    = "backend_%s_last_poll"    //nolint:gosec
+	kvKeyLastSuccess = "backend_%s_last_success" //nolint:gosec
+	kvKeyFailures    = "backend_%s_failures"     //nolint:gosec
+	kvKeyLastError   = "backend_%s_last_error"   //nolint:gosec
+)
+
 // StateStore manages backend state persistence in the Mattermost KV store
 // All keys are scoped to the specific backend ID for isolation
 type StateStore struct {
@@ -41,7 +51,7 @@ func (s *StateStore) SaveAuthToken(token string, expiry time.Time) error {
 		return fmt.Errorf("failed to marshal auth token state: %w", err)
 	}
 
-	key := fmt.Sprintf("backend_%s_auth", s.backendID)
+	key := fmt.Sprintf(kvKeyAuthToken, s.backendID)
 	if err := s.api.KVSet(key, data); err != nil {
 		return fmt.Errorf("failed to save auth token: %w", err)
 	}
@@ -52,7 +62,7 @@ func (s *StateStore) SaveAuthToken(token string, expiry time.Time) error {
 // GetAuthToken retrieves the stored authentication token and expiry time
 // Returns empty string and zero time if no token is stored
 func (s *StateStore) GetAuthToken() (string, time.Time, error) {
-	key := fmt.Sprintf("backend_%s_auth", s.backendID)
+	key := fmt.Sprintf(kvKeyAuthToken, s.backendID)
 	data, err := s.api.KVGet(key)
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("failed to get auth token: %w", err)
@@ -73,7 +83,7 @@ func (s *StateStore) GetAuthToken() (string, time.Time, error) {
 
 // SaveCursor stores the pagination cursor for the next API request
 func (s *StateStore) SaveCursor(cursor string) error {
-	key := fmt.Sprintf("backend_%s_cursor", s.backendID)
+	key := fmt.Sprintf(kvKeyCursor, s.backendID)
 	if err := s.api.KVSet(key, []byte(cursor)); err != nil {
 		return fmt.Errorf("failed to save cursor: %w", err)
 	}
@@ -83,7 +93,7 @@ func (s *StateStore) SaveCursor(cursor string) error {
 // GetCursor retrieves the stored pagination cursor
 // Returns empty string if no cursor is stored
 func (s *StateStore) GetCursor() (string, error) {
-	key := fmt.Sprintf("backend_%s_cursor", s.backendID)
+	key := fmt.Sprintf(kvKeyCursor, s.backendID)
 	data, err := s.api.KVGet(key)
 	if err != nil {
 		return "", fmt.Errorf("failed to get cursor: %w", err)
@@ -98,7 +108,7 @@ func (s *StateStore) GetCursor() (string, error) {
 
 // SaveLastPoll stores the timestamp of the last poll attempt
 func (s *StateStore) SaveLastPoll(t time.Time) error {
-	key := fmt.Sprintf("backend_%s_last_poll", s.backendID)
+	key := fmt.Sprintf(kvKeyLastPoll, s.backendID)
 	data, err := json.Marshal(t)
 	if err != nil {
 		return fmt.Errorf("failed to marshal last poll time: %w", err)
@@ -114,7 +124,7 @@ func (s *StateStore) SaveLastPoll(t time.Time) error {
 // GetLastPoll retrieves the timestamp of the last poll attempt
 // Returns zero time if no poll time is stored
 func (s *StateStore) GetLastPoll() (time.Time, error) {
-	key := fmt.Sprintf("backend_%s_last_poll", s.backendID)
+	key := fmt.Sprintf(kvKeyLastPoll, s.backendID)
 	data, err := s.api.KVGet(key)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to get last poll time: %w", err)
@@ -141,7 +151,7 @@ func (s *StateStore) IncrementFailures() (int, error) {
 
 	count++
 
-	key := fmt.Sprintf("backend_%s_failures", s.backendID)
+	key := fmt.Sprintf(kvKeyFailures, s.backendID)
 	data, err := json.Marshal(count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to marshal failures count: %w", err)
@@ -156,7 +166,7 @@ func (s *StateStore) IncrementFailures() (int, error) {
 
 // ResetFailures resets the consecutive failures counter to zero
 func (s *StateStore) ResetFailures() error {
-	key := fmt.Sprintf("backend_%s_failures", s.backendID)
+	key := fmt.Sprintf(kvKeyFailures, s.backendID)
 	data, err := json.Marshal(0)
 	if err != nil {
 		return fmt.Errorf("failed to marshal failures count: %w", err)
@@ -172,7 +182,7 @@ func (s *StateStore) ResetFailures() error {
 // GetFailures retrieves the current consecutive failures count
 // Returns 0 if no count is stored
 func (s *StateStore) GetFailures() (int, error) {
-	key := fmt.Sprintf("backend_%s_failures", s.backendID)
+	key := fmt.Sprintf(kvKeyFailures, s.backendID)
 	data, err := s.api.KVGet(key)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get failures count: %w", err)
@@ -192,7 +202,7 @@ func (s *StateStore) GetFailures() (int, error) {
 
 // SaveLastSuccess stores the timestamp of the last successful poll
 func (s *StateStore) SaveLastSuccess(t time.Time) error {
-	key := fmt.Sprintf("backend_%s_last_success", s.backendID)
+	key := fmt.Sprintf(kvKeyLastSuccess, s.backendID)
 	data, err := json.Marshal(t)
 	if err != nil {
 		return fmt.Errorf("failed to marshal last success time: %w", err)
@@ -208,7 +218,7 @@ func (s *StateStore) SaveLastSuccess(t time.Time) error {
 // GetLastSuccess retrieves the timestamp of the last successful poll
 // Returns zero time if no success time is stored
 func (s *StateStore) GetLastSuccess() (time.Time, error) {
-	key := fmt.Sprintf("backend_%s_last_success", s.backendID)
+	key := fmt.Sprintf(kvKeyLastSuccess, s.backendID)
 	data, err := s.api.KVGet(key)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to get last success time: %w", err)
@@ -228,7 +238,7 @@ func (s *StateStore) GetLastSuccess() (time.Time, error) {
 
 // SaveLastError stores the error message from the most recent failure
 func (s *StateStore) SaveLastError(errMsg string) error {
-	key := fmt.Sprintf("backend_%s_last_error", s.backendID)
+	key := fmt.Sprintf(kvKeyLastError, s.backendID)
 	if err := s.api.KVSet(key, []byte(errMsg)); err != nil {
 		return fmt.Errorf("failed to save last error: %w", err)
 	}
@@ -238,7 +248,7 @@ func (s *StateStore) SaveLastError(errMsg string) error {
 // GetLastError retrieves the error message from the most recent failure
 // Returns empty string if no error is stored
 func (s *StateStore) GetLastError() (string, error) {
-	key := fmt.Sprintf("backend_%s_last_error", s.backendID)
+	key := fmt.Sprintf(kvKeyLastError, s.backendID)
 	data, err := s.api.KVGet(key)
 	if err != nil {
 		return "", fmt.Errorf("failed to get last error: %w", err)
@@ -251,16 +261,34 @@ func (s *StateStore) GetLastError() (string, error) {
 	return string(data), nil
 }
 
+// ClearOperationalState removes cursor and auth token from the KV store
+// This preserves failure tracking state for status display while ensuring
+// a fresh start when a disabled backend is eventually re-enabled
+func (s *StateStore) ClearOperationalState() error {
+	keys := []string{
+		fmt.Sprintf(kvKeyAuthToken, s.backendID),
+		fmt.Sprintf(kvKeyCursor, s.backendID),
+	}
+
+	for _, key := range keys {
+		if err := s.api.KVDelete(key); err != nil {
+			return fmt.Errorf("failed to delete key %s: %w", key, err)
+		}
+	}
+
+	return nil
+}
+
 // ClearAll removes all state for this backend from the KV store
 // Useful when a backend is being removed
 func (s *StateStore) ClearAll() error {
 	keys := []string{
-		fmt.Sprintf("backend_%s_auth", s.backendID),
-		fmt.Sprintf("backend_%s_cursor", s.backendID),
-		fmt.Sprintf("backend_%s_last_poll", s.backendID),
-		fmt.Sprintf("backend_%s_last_success", s.backendID),
-		fmt.Sprintf("backend_%s_failures", s.backendID),
-		fmt.Sprintf("backend_%s_last_error", s.backendID),
+		fmt.Sprintf(kvKeyAuthToken, s.backendID),
+		fmt.Sprintf(kvKeyCursor, s.backendID),
+		fmt.Sprintf(kvKeyLastPoll, s.backendID),
+		fmt.Sprintf(kvKeyLastSuccess, s.backendID),
+		fmt.Sprintf(kvKeyFailures, s.backendID),
+		fmt.Sprintf(kvKeyLastError, s.backendID),
 	}
 
 	for _, key := range keys {

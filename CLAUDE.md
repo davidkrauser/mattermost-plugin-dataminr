@@ -321,7 +321,8 @@ A central registry (implemented in `server/backend/registry.go`) manages all bac
    - Create backend instance (factory pattern based on type)
    - Initialize with config
    - Register in registry
-   - Start polling
+   - If backend is enabled: start polling
+   - If backend is disabled: clear operational state (cursor + auth token)
 
 **On Configuration Change:**
 1. Parse new `Backends` configuration
@@ -329,11 +330,19 @@ A central registry (implemented in `server/backend/registry.go`) manages all bac
 3. For removed backends:
    - Stop and unregister
 4. For new backends:
-   - Create, initialize, register, start
+   - Create, initialize, register
+   - If enabled: start polling
+   - If disabled: clear operational state
 5. For modified backends:
    - Stop old instance
    - Create new instance
-   - Start new instance
+   - If enabled: start polling, resetting failure state
+   - If disabled: clear operational state
+
+**Operational State Management:**
+- **Disabled backends**: When a backend is registered but not enabled, `ClearOperationalState()` removes cursor and auth token from KV store while preserving failure tracking data (last poll, last success, consecutive failures, last error)
+- **Re-enabling backends**: When a disabled backend is re-enabled via configuration change, failure state is reset (consecutive failures = 0, last error = "") to ensure a fresh start
+- **Purpose**: Ensures disabled backends start fresh when re-enabled, avoiding issues with stale authentication tokens or outdated pagination cursors
 
 **On Plugin Deactivation:**
 1. Stop all backends gracefully
@@ -419,12 +428,21 @@ server/backend/
   - Calls alert handler callback for each new alert
 
 **State Storage (`state.go`):**
-- KV store keys: `backend_{id}_cursor`, `backend_{id}_last_poll`, `backend_{id}_failures`, `backend_{id}_auth`
+- **KV store keys** (defined as constants):
+  - `backend_{id}_cursor` - Pagination cursor
+  - `backend_{id}_auth` - Authentication token and expiry
+  - `backend_{id}_last_poll` - Last poll attempt timestamp
+  - `backend_{id}_last_success` - Last successful poll timestamp
+  - `backend_{id}_failures` - Consecutive failure counter
+  - `backend_{id}_last_error` - Most recent error message
   - Uses backend UUID `id` field for stable key naming
   - Keys remain unchanged when backend `name` is updated
-- Cursor tracking for pagination
-- Auth token persistence
-- Error count tracking
+- **State Management**:
+  - `ClearOperationalState()` - Removes cursor and auth token only (preserves failure tracking)
+  - `ClearAll()` - Removes all state keys for backend removal
+  - Cursor tracking for pagination
+  - Auth token persistence with expiry
+  - Error count and message tracking
 
 ---
 

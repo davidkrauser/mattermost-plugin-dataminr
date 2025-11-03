@@ -369,19 +369,22 @@ func (p *Poller) handlePollError(err error) {
 
 		// Call disable callback to persist the configuration change
 		// This will trigger OnConfigurationChange which will stop the backend
+		// Wrap in goroutine to avoid deadlock (callback triggers Stop() on this backend)
 		if p.disableCallback != nil {
-			if disableErr := p.disableCallback(p.backendID); disableErr != nil {
-				p.api.Log.Error("Failed to disable backend in configuration",
-					"backendId", p.backendID,
-					"error", disableErr.Error())
-
-				// Fallback: stop the poller locally if callback fails
-				if stopErr := p.Stop(); stopErr != nil {
-					p.api.Log.Error("Failed to stop poller after callback failure",
+			go func() {
+				if disableErr := p.disableCallback(p.backendID); disableErr != nil {
+					p.api.Log.Error("Failed to disable backend in configuration",
 						"backendId", p.backendID,
-						"error", stopErr.Error())
+						"error", disableErr.Error())
+
+					// Fallback: stop the poller locally if callback fails
+					if stopErr := p.Stop(); stopErr != nil {
+						p.api.Log.Error("Failed to stop poller after callback failure",
+							"backendId", p.backendID,
+							"error", stopErr.Error())
+					}
 				}
-			}
+			}()
 		} else {
 			// Fallback: stop the poller if no callback is provided
 			p.api.Log.Warn("No disable callback provided, stopping poller locally",

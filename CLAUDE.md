@@ -587,6 +587,12 @@ Response: {"alerts": [...], "to": "cursor"}
 - Use `getConfiguration()` to safely clone config, modify the clone, then call `SavePluginConfig()` without holding locks
 - When re-enabling a backend, failure state is reset (error count and message cleared) to ensure fresh start
 
+**Backend Auto-Disable Callback:**
+- **CRITICAL**: The `disableCallback` in poller.go must be invoked in a goroutine to prevent deadlock
+- Without the goroutine wrapper, when a backend reaches max failures, the poller thread calls `disableCallback()` → triggers `OnConfigurationChange()` → tries to call `backend.Stop()` → waits for the poller to stop → but the poller is waiting for the callback to return = deadlock
+- Wrapping in goroutine allows the poll cycle to complete, then `OnConfigurationChange()` cleanly unregisters, stops, and re-registers the backend as disabled
+- This ensures disabled backends remain in the registry and appear in the status API response
+
 **Polling Wait Interval:**
 - **CRITICAL**: The cluster job scheduler's `nextWaitInterval()` must calculate elapsed time since last execution
 - Returning a fixed interval regardless of elapsed time will cause the job to never execute

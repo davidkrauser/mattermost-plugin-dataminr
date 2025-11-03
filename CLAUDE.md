@@ -396,9 +396,10 @@ server/backend/
   - Skips posting alerts older than 24 hours
   - Stops when first alert within 24 hours is found
   - Saves cursor after each API call for crash recovery
+  - **Failure Tracking**: Updates `lastPoll` before each API call, tracks `lastSuccess`, resets failure counter and clears error message on successful fetch (same as regular polling)
+  - Disables backend on errors after `MaxConsecutiveFailures` (5) consecutive failures
   - Then starts regular polling job
   - Cancellable via context (Stop() cancels cleanly)
-  - Disables backend on errors (same as regular polling)
 - Regular polling: Load cursor from state → poll API → process alerts → save cursor
 - Graceful shutdown by canceling scheduled jobs and catch-up routine
 - Each backend registers its own unique job with a backend-specific job ID

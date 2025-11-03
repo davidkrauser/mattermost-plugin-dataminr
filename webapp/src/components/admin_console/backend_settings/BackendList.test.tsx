@@ -198,11 +198,11 @@ describe('BackendList', () => {
             statusIndicator: StatusIndicator.Active,
         });
 
-        // Backend 2 should have Disabled status (consecutiveFailures >= 5 and enabled = false)
+        // Backend 2 should have Error status (consecutiveFailures >= 5 and enabled = false with errors)
         expect(cards.at(1).prop('backend')).toMatchObject({
             ...mockBackend2,
             status: mockStatus2,
-            statusIndicator: StatusIndicator.Disabled,
+            statusIndicator: StatusIndicator.Error,
         });
     });
 

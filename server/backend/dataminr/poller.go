@@ -123,6 +123,13 @@ func (p *Poller) catchUp(ctx context.Context) {
 	totalSkipped := 0
 
 	for {
+		// Update last poll time before making API call
+		if err := p.stateStore.SaveLastPoll(time.Now()); err != nil {
+			p.api.Log.Error("Failed to save last poll time during catch-up",
+				"backendId", p.backendID,
+				"error", err.Error())
+		}
+
 		// Fetch alerts with current cursor
 		response, err := p.client.FetchAlerts(cursor)
 		if err != nil {
@@ -153,6 +160,27 @@ func (p *Poller) catchUp(ctx context.Context) {
 					"backendId", p.backendID,
 					"error", err.Error())
 			}
+		}
+
+		// Update last success time on successful fetch
+		if err := p.stateStore.SaveLastSuccess(time.Now()); err != nil {
+			p.api.Log.Error("Failed to save last success time during catch-up",
+				"backendId", p.backendID,
+				"error", err.Error())
+		}
+
+		// Reset failure counter on successful fetch (same as regular polling)
+		if err := p.stateStore.ResetFailures(); err != nil {
+			p.api.Log.Error("Failed to reset failure counter during catch-up",
+				"backendId", p.backendID,
+				"error", err.Error())
+		}
+
+		// Clear last error on success
+		if err := p.stateStore.SaveLastError(""); err != nil {
+			p.api.Log.Error("Failed to clear last error during catch-up",
+				"backendId", p.backendID,
+				"error", err.Error())
 		}
 
 		// If we found a recent alert, we're caught up

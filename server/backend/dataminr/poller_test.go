@@ -338,8 +338,12 @@ func TestPoller_Start_WithoutCursor_StartsCatchUp(t *testing.T) {
 	api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 	// Mock GetCursor to return no cursor
 	api.On("KVGet", "backend_test-id_cursor").Return(nil, nil)
-	// Mock SaveCursor during catch-up
+	// Mock state tracking during catch-up
 	api.On("KVSet", "backend_test-id_cursor", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_last_poll", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_last_success", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_failures", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_last_error", mock.Anything).Return(nil).Maybe()
 
 	client := pluginapi.NewClient(api, &plugintest.Driver{})
 	stateStore := NewStateStore(api, "test-id")
@@ -378,7 +382,12 @@ func TestPoller_CatchUp_SkipsOldAlerts(t *testing.T) {
 	api := plugintest.NewAPI(t)
 	api.On("LogInfo", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 	api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+	// Mock state tracking during catch-up
 	api.On("KVSet", "backend_test-id_cursor", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_last_poll", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_last_success", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_failures", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_last_error", mock.Anything).Return(nil).Maybe()
 
 	client := pluginapi.NewClient(api, &plugintest.Driver{})
 	stateStore := NewStateStore(api, "test-id")
@@ -435,8 +444,12 @@ func TestPoller_CatchUp_HandlesCancellation(t *testing.T) {
 	api := plugintest.NewAPI(t)
 	api.On("LogInfo", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 	api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
-	// Mock KVSet for cursor saves during catch-up
+	// Mock state tracking during catch-up
 	api.On("KVSet", "backend_test-id_cursor", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_last_poll", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_last_success", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_failures", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_last_error", mock.Anything).Return(nil).Maybe()
 
 	client := pluginapi.NewClient(api, &plugintest.Driver{})
 	stateStore := NewStateStore(api, "test-id")
@@ -484,7 +497,12 @@ func TestPoller_Stop_CancelsCatchUp(t *testing.T) {
 	api.On("LogInfo", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 	api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 	api.On("KVGet", "backend_test-id_cursor").Return(nil, nil).Once()
+	// Mock state tracking during catch-up
 	api.On("KVSet", "backend_test-id_cursor", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_last_poll", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_last_success", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_failures", mock.Anything).Return(nil).Maybe()
+	api.On("KVSet", "backend_test-id_last_error", mock.Anything).Return(nil).Maybe()
 
 	client := pluginapi.NewClient(api, &plugintest.Driver{})
 	stateStore := NewStateStore(api, "test-id")

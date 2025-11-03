@@ -170,7 +170,7 @@ func (b *Backend) GetStatus() backend.Status {
 	defer b.mu.RUnlock()
 
 	status := backend.Status{
-		Enabled: b.config.Enabled && b.running,
+		Enabled: b.config.Enabled,
 	}
 
 	// Get last poll time from state

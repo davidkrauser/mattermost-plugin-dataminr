@@ -244,7 +244,7 @@ func TestDataminrBackend_FullIntegration(t *testing.T) {
 	// Test status reporting
 	t.Run("get backend status", func(t *testing.T) {
 		status := b.GetStatus()
-		assert.False(t, status.Enabled) // backend was stopped
+		assert.True(t, status.Enabled) // backend is enabled in config
 		// Note: IsAuthenticated check removed due to timing sensitivity in tests
 		assert.Equal(t, 0, status.ConsecutiveFailures)
 		assert.Empty(t, status.LastError)

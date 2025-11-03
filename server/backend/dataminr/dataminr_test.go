@@ -399,7 +399,7 @@ func TestDataminrBackend_GetStatus(t *testing.T) {
 
 		status := b.GetStatus()
 
-		assert.False(t, status.Enabled) // backend is enabled but not running
+		assert.True(t, status.Enabled) // backend is enabled in config
 		assert.True(t, status.LastPollTime.IsZero())
 		assert.True(t, status.LastSuccessTime.IsZero())
 		assert.Equal(t, 0, status.ConsecutiveFailures)

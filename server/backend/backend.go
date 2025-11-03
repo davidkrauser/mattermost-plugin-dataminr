@@ -35,7 +35,7 @@ type Config struct {
 
 // Status represents the current operational status of a backend instance.
 type Status struct {
-	// Enabled indicates whether the backend is currently active
+	// Enabled indicates whether the backend is enabled in configuration
 	Enabled bool `json:"enabled"`
 
 	// LastPollTime is the timestamp of the last poll attempt

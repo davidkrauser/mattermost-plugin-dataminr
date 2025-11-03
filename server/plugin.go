@@ -93,15 +93,10 @@ func (p *Plugin) OnDeactivate() error {
 	return nil
 }
 
-// createAndStartBackend creates a backend instance, registers it, and starts it.
+// createAndStartBackend creates a backend instance and registers it.
+// If the backend is enabled, it also starts the backend.
 // Logs errors but does not fail - errors are non-fatal for individual backends.
 func (p *Plugin) createAndStartBackend(config backend.Config) {
-	// Skip disabled backends
-	if !config.Enabled {
-		p.API.LogInfo("Skipping disabled backend", "id", config.ID, "name", config.Name)
-		return
-	}
-
 	// Create backend instance using factory, passing the disable callback
 	b, err := backend.Create(config, p.client, p.API, p.poster, p.disableBackend)
 	if err != nil {
@@ -109,17 +104,22 @@ func (p *Plugin) createAndStartBackend(config backend.Config) {
 		return
 	}
 
-	// Register backend
+	// Register backend (always register, even if disabled)
 	if err := p.registry.Register(b); err != nil {
 		p.API.LogError("Failed to register backend", "id", config.ID, "name", config.Name, "error", err.Error())
+		return
+	}
+
+	// Only start the backend if it's enabled
+	if !config.Enabled {
+		p.API.LogInfo("Backend registered but not started (disabled)", "id", config.ID, "name", config.Name)
 		return
 	}
 
 	// Start backend
 	if err := b.Start(); err != nil {
 		p.API.LogError("Failed to start backend", "id", config.ID, "name", config.Name, "error", err.Error())
-		// Unregister since we couldn't start it
-		_ = p.registry.Unregister(config.ID)
+		// Keep backend registered even if start fails - it will show error state in status
 		return
 	}
 

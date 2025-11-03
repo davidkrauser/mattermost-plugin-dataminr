@@ -1032,3 +1032,120 @@ This section documents enhancements and fixes made after the initial implementat
 - ✅ Rate-limit friendly with 5-second intervals
 
 **Commit**: 1b526e8
+
+---
+
+### 2025-11-03: Status Pill UX Improvements
+
+**Problem**: Backend status information was verbose and status pills had visibility issues across different Mattermost themes.
+
+**Changes**:
+
+**Status Indicator Enhancement** (commit 727bd48):
+- Added new "Error" status indicator for backends disabled due to failures
+- Differentiated between "Disabled" (manually disabled by admin) and "Error" (auto-disabled after failures)
+- Updated status logic to check both `enabled` flag and error conditions
+- Red pill shows for Error state, gray pill for manually Disabled state
+
+**Status Information Consolidation** (commit 0f058ba):
+- Removed verbose Status section from backend cards
+- Moved all status information to pill tooltips:
+  - Active status: Shows last successful poll timestamp on hover
+  - Warning/Error status: Shows last error message on hover
+  - Unknown status: No tooltip
+- Simplified UI while keeping critical information accessible
+
+**Visual Reliability** (commit 78a6e60):
+- Fixed status pill background colors that were appearing white/invisible
+- Changed from `rgb(var(...))` syntax to `var(..., fallback)` with explicit hex colors
+- Added color fallbacks: Red #d24b4e (error), Orange #ffbc1f (warning), Green #06d6a0 (success)
+- Ensures pills are visible in all Mattermost themes
+
+**Benefits**:
+- ✅ Cleaner, more compact backend card UI
+- ✅ Clear visual distinction between error states and manual disables
+- ✅ Reliable colors across all themes
+- ✅ Important status info still accessible via tooltips
+
+**Commits**: 727bd48, 0f058ba, 78a6e60
+
+---
+
+### 2025-11-03: Backend Lifecycle and State Management Fixes
+
+**Critical Deadlock Fix** (commit 55f376f):
+- **Problem**: When a backend hit the failure limit and auto-disabled, the system would deadlock
+- **Root Cause**: `disableBackend()` held `configurationLock` while calling `SavePluginConfig()`, which triggered `OnConfigurationChange()`, which tried to acquire the same lock
+- **Solution**: Use `getConfiguration()` to safely clone config, modify the clone, and call `SavePluginConfig()` without holding any locks
+- **Impact**: Prevented system freeze when backends failed
+
+**Failure State Reset** (commit 710273e):
+- **Problem**: When re-enabling a previously failed backend, old failure state (error count, error message) persisted in KV store
+- **Issue**: Status API showed stale failure data for re-enabled backends
+- **Solution**: Clear failure state (reset count to 0, clear error message) when backend starts
+- **Impact**: Ensures fresh start when admin explicitly re-enables a backend, matching spec requirement for "cleared error state"
+
+**Related Commits**: Multiple attempts at registry fixes (commits b049c5d, 5cb3fed) were consolidated into the final solution
+
+**Benefits**:
+- ✅ No more deadlocks during backend auto-disable
+- ✅ Clean state when re-enabling backends
+- ✅ Reliable backend lifecycle management
+
+**Commits**: 55f376f, 710273e
+
+---
+
+### 2025-10-31: Webapp Validation and Test Infrastructure
+
+**Validation Improvements** (commit cb0f88b):
+- Added validation on component mount to show errors immediately after page refresh
+- Track user changes with `useRef` to avoid re-validating during active edits
+- Clear validation errors when user makes changes for better UX
+
+**Test Infrastructure Fixes** (commit cb0f88b):
+- Fixed `client.test.ts`: Properly mock `@mattermost/client` module with correct plugin ID
+- Fixed `useBackendStatus.test.ts`: Add client mock and simplify to avoid timer issues
+- Fixed `index.test.tsx`: Use `mount()` for useEffect testing, add JSDOM support
+- Added JSDOM setup in `tests/setup.tsx` to support Enzyme mount() tests
+
+**TypeScript Fixes** (commit cca51ab, cb0f88b):
+- Removed `FormattedMessage` usage in `form_fields.tsx` (replaced with plain spans)
+- Made optional props in `BackendSettings` properly typed
+- Added type assertions and non-null assertions where needed
+- Installed `@types/jsdom` package for proper type support
+
+**Benefits**:
+- ✅ All 103 tests passing with no lint errors
+- ✅ Better validation UX with immediate feedback
+- ✅ Comprehensive test coverage for webapp components
+- ✅ Type-safe TypeScript throughout
+
+**Commits**: cca51ab, cb0f88b
+
+---
+
+### 2025-10-31: Critical Polling Bug Fix
+
+**Problem**: Backends were never actually polling for alerts. The poller job was registered but never executed, so no alerts were ever posted to Mattermost channels despite proper configuration.
+
+**Root Cause**: The `nextWaitInterval()` function always returned the full poll interval (e.g., 30 seconds) regardless of how much time had elapsed since the last poll. This caused the cluster job scheduler to continuously defer execution indefinitely.
+
+**Solution**: Fixed the wait interval calculation logic:
+- Calculate time elapsed since `lastFinished`
+- Return remaining wait time if the full interval hasn't elapsed yet
+- Return 0 (execute immediately) if the interval has elapsed
+- Handle first run case (zero `lastFinished` timestamp)
+
+**Testing**:
+- Added comprehensive tests covering:
+  - First run scenario (zero lastFinished)
+  - Subsequent run with time remaining
+  - Subsequent run after full interval
+  - Subsequent run after more than interval
+
+**Impact**: This was a critical bug that completely prevented the plugin's core functionality. After this fix, polling and alert posting work correctly.
+
+**Code Location**: `server/backend/dataminr/poller.go:103-118`
+
+**Commit**: eb2928d

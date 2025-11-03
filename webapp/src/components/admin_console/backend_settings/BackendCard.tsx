@@ -26,7 +26,7 @@ const StatusPill = ({indicator, status}: {indicator: StatusIndicator; status?: B
 
     if (indicator === 'active' && status?.lastSuccessTime) {
         tooltip = `Last successful poll: ${new Date(status.lastSuccessTime).toLocaleString()}`;
-    } else if ((indicator === 'warning' || indicator === 'disabled') && status?.lastError) {
+    } else if ((indicator === 'warning' || indicator === 'error') && status?.lastError) {
         tooltip = status.lastError;
     }
 
@@ -36,7 +36,9 @@ const StatusPill = ({indicator, status}: {indicator: StatusIndicator; status?: B
     case 'warning':
         return <WarningPill title={tooltip}>{'WARNING'}</WarningPill>;
     case 'disabled':
-        return <DangerPill title={tooltip}>{'DISABLED'}</DangerPill>;
+        return <GrayPill>{'DISABLED'}</GrayPill>;
+    case 'error':
+        return <DangerPill title={tooltip}>{'ERROR'}</DangerPill>;
     case 'unknown':
     default:
         return <GrayPill>{'UNKNOWN'}</GrayPill>;

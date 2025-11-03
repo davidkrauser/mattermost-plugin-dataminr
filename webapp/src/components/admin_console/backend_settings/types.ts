@@ -38,9 +38,10 @@ export interface BackendStatus {
  * Status indicator types for UI display
  */
 export enum StatusIndicator {
-    Active = 'active', // consecutiveFailures = 0
-    Warning = 'warning', // 1-4 consecutive failures
-    Disabled = 'disabled', // consecutiveFailures >= 5
+    Active = 'active', // consecutiveFailures = 0 and enabled
+    Warning = 'warning', // 1-4 consecutive failures and enabled
+    Disabled = 'disabled', // Backend disabled with no errors
+    Error = 'error', // Backend disabled with errors
     Unknown = 'unknown', // No status data available
 }
 
@@ -54,27 +55,33 @@ export interface BackendDisplay extends BackendConfig {
 
 /**
  * Determines the status indicator based on backend status.
- * The backend automatically disables a backend after consecutive failures,
- * so we just need to check the current state:
+ * Logic:
  * - No status data → Unknown
- * - No errors (consecutiveFailures = 0) → Active
- * - Has errors but still enabled → Warning
- * - Has errors and disabled → Disabled
+ * - Backend disabled with errors → Error
+ * - Backend disabled with no errors → Disabled
+ * - Backend enabled with no errors → Active
+ * - Backend enabled with errors → Warning
  */
 export function getStatusIndicator(status?: BackendStatus): StatusIndicator {
     if (!status) {
         return StatusIndicator.Unknown;
     }
 
+    // Backend is disabled
+    if (!status.enabled) {
+        // Check if there are errors
+        if (status.consecutiveFailures > 0 || status.lastError) {
+            return StatusIndicator.Error;
+        }
+        return StatusIndicator.Disabled;
+    }
+
+    // Backend is enabled
     if (status.consecutiveFailures === 0) {
         return StatusIndicator.Active;
     }
 
-    if (status.enabled) {
-        return StatusIndicator.Warning;
-    }
-
-    return StatusIndicator.Disabled;
+    return StatusIndicator.Warning;
 }
 
 /**

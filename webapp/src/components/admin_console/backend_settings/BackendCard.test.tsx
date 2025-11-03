@@ -107,6 +107,21 @@ describe('BackendCard', () => {
         expect(disabledBackend.statusIndicator).toBe(StatusIndicator.Disabled);
     });
 
+    it('should show status pill for error status', () => {
+        const errorBackend = {...mockBackend, statusIndicator: StatusIndicator.Error};
+        shallow(
+            <BackendCard
+                backend={errorBackend}
+                allBackends={[errorBackend]}
+                onChange={mockOnChange}
+                onDelete={mockOnDelete}
+            />,
+        );
+
+        // Check that backend has error status indicator
+        expect(errorBackend.statusIndicator).toBe(StatusIndicator.Error);
+    });
+
     it('should show status pill for unknown status', () => {
         shallow(
             <BackendCard
@@ -306,10 +321,10 @@ describe('BackendCard', () => {
         expect(statusPill.prop('indicator')).toBe(StatusIndicator.Active);
     });
 
-    it('should display last error in tooltip for disabled status', () => {
+    it('should display last error in tooltip for error status', () => {
         const backendWithError: BackendDisplay = {
             ...mockBackend,
-            statusIndicator: StatusIndicator.Disabled,
+            statusIndicator: StatusIndicator.Error,
             status: {
                 enabled: false,
                 lastPollTime: '2025-10-31T12:00:00Z',
@@ -336,7 +351,7 @@ describe('BackendCard', () => {
 
         // The tooltip should be computed in the StatusPill component
         // We verify the props are passed correctly
-        expect(statusPill.prop('indicator')).toBe(StatusIndicator.Disabled);
+        expect(statusPill.prop('indicator')).toBe(StatusIndicator.Error);
     });
 
     it('should not display tooltip when status is unavailable', () => {

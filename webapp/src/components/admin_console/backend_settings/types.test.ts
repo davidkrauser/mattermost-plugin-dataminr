@@ -13,7 +13,7 @@ describe('getStatusIndicator', () => {
         expect(getStatusIndicator(undefined)).toBe(StatusIndicator.Unknown);
     });
 
-    it('should return Active when consecutiveFailures is 0', () => {
+    it('should return Active when enabled and no errors', () => {
         const status: BackendStatus = {
             enabled: true,
             lastPollTime: '2025-10-30T12:00:00Z',
@@ -25,19 +25,7 @@ describe('getStatusIndicator', () => {
         expect(getStatusIndicator(status)).toBe(StatusIndicator.Active);
     });
 
-    it('should return Active when consecutiveFailures is 0 even if disabled', () => {
-        const status: BackendStatus = {
-            enabled: false,
-            lastPollTime: '2025-10-30T12:00:00Z',
-            lastSuccessTime: '2025-10-30T12:00:00Z',
-            consecutiveFailures: 0,
-            isAuthenticated: true,
-            lastError: '',
-        };
-        expect(getStatusIndicator(status)).toBe(StatusIndicator.Active);
-    });
-
-    it('should return Warning when has errors but still enabled', () => {
+    it('should return Warning when enabled with errors', () => {
         const status: BackendStatus = {
             enabled: true,
             lastPollTime: '2025-10-30T12:00:00Z',
@@ -49,7 +37,19 @@ describe('getStatusIndicator', () => {
         expect(getStatusIndicator(status)).toBe(StatusIndicator.Warning);
     });
 
-    it('should return Disabled when has errors and is disabled', () => {
+    it('should return Disabled when disabled and no errors', () => {
+        const status: BackendStatus = {
+            enabled: false,
+            lastPollTime: '2025-10-30T12:00:00Z',
+            lastSuccessTime: '2025-10-30T12:00:00Z',
+            consecutiveFailures: 0,
+            isAuthenticated: true,
+            lastError: '',
+        };
+        expect(getStatusIndicator(status)).toBe(StatusIndicator.Disabled);
+    });
+
+    it('should return Error when disabled with consecutive failures', () => {
         const status: BackendStatus = {
             enabled: false,
             lastPollTime: '2025-10-30T12:00:00Z',
@@ -58,10 +58,22 @@ describe('getStatusIndicator', () => {
             isAuthenticated: false,
             lastError: 'too many failures',
         };
-        expect(getStatusIndicator(status)).toBe(StatusIndicator.Disabled);
+        expect(getStatusIndicator(status)).toBe(StatusIndicator.Error);
     });
 
-    it('should return Disabled when has many errors and is disabled', () => {
+    it('should return Error when disabled with lastError', () => {
+        const status: BackendStatus = {
+            enabled: false,
+            lastPollTime: '2025-10-30T12:00:00Z',
+            lastSuccessTime: '2025-10-30T11:00:00Z',
+            consecutiveFailures: 0,
+            isAuthenticated: false,
+            lastError: 'authentication failed',
+        };
+        expect(getStatusIndicator(status)).toBe(StatusIndicator.Error);
+    });
+
+    it('should return Error when disabled with both consecutiveFailures and lastError', () => {
         const status: BackendStatus = {
             enabled: false,
             lastPollTime: '2025-10-30T12:00:00Z',
@@ -70,7 +82,7 @@ describe('getStatusIndicator', () => {
             isAuthenticated: false,
             lastError: 'too many failures',
         };
-        expect(getStatusIndicator(status)).toBe(StatusIndicator.Disabled);
+        expect(getStatusIndicator(status)).toBe(StatusIndicator.Error);
     });
 });
 

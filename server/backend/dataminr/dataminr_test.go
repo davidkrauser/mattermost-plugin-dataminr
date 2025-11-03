@@ -252,6 +252,11 @@ func TestDataminrBackend_Start(t *testing.T) {
 
 			mockAPI := &plugintest.API{}
 			mockAPI.On("LogInfo", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+			// When enabled, expect KVSet calls to reset failure state
+			if tt.enabled {
+				mockAPI.On("KVSet", "backend_test-backend_failures", []byte("0")).Return(nil)
+				mockAPI.On("KVSet", "backend_test-backend_last_error", []byte("")).Return(nil)
+			}
 			client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
 
 			b, err := New(config, client, mockAPI, &MockPoster{}, nil)
@@ -317,6 +322,46 @@ func TestDataminrBackend_StartAlreadyRunning(t *testing.T) {
 	assert.Contains(t, err.Error(), "backend already running")
 }
 
+func TestDataminrBackend_StartResetsFailureState(t *testing.T) {
+	config := backend.Config{
+		ID:                  "test-backend",
+		Name:                "Test Backend",
+		Type:                "dataminr",
+		Enabled:             true,
+		URL:                 "https://api.dataminr.com",
+		APIId:               "test-id",
+		APIKey:              "test-key",
+		ChannelID:           "channel123",
+		PollIntervalSeconds: 30,
+	}
+
+	mockAPI := &plugintest.API{}
+	mockAPI.On("LogInfo", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+	// Expect KVSet calls to reset failures and clear error
+	mockAPI.On("KVSet", "backend_test-backend_failures", []byte("0")).Return(nil)
+	mockAPI.On("KVSet", "backend_test-backend_last_error", []byte("")).Return(nil)
+	client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
+
+	b, err := New(config, client, mockAPI, &MockPoster{}, nil)
+	require.NoError(t, err)
+
+	// Inject mock scheduler
+	mockJob := &MockJob{}
+	mockScheduler := &MockJobScheduler{
+		ScheduleFn: func(jobID string, nextWaitInterval cluster.NextWaitInterval, callback func()) (Job, error) {
+			return mockJob, nil
+		},
+	}
+	b.poller.SetScheduler(mockScheduler)
+
+	err = b.Start()
+	require.NoError(t, err)
+	assert.True(t, b.running)
+
+	// Verify that failure state was reset
+	mockAPI.AssertExpectations(t)
+}
+
 func TestDataminrBackend_Stop(t *testing.T) {
 	config := backend.Config{
 		ID:                  "test-backend",
@@ -345,6 +390,9 @@ func TestDataminrBackend_Stop(t *testing.T) {
 	t.Run("stop when running", func(t *testing.T) {
 		mockAPI := &plugintest.API{}
 		mockAPI.On("LogInfo", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+		// Expect KVSet calls when Start resets failure state
+		mockAPI.On("KVSet", "backend_test-backend_failures", []byte("0")).Return(nil)
+		mockAPI.On("KVSet", "backend_test-backend_last_error", []byte("")).Return(nil)
 		client := pluginapi.NewClient(mockAPI, &plugintest.Driver{})
 
 		b, err := New(config, client, mockAPI, &MockPoster{}, nil)

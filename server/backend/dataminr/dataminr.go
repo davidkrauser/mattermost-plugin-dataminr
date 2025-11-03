@@ -116,6 +116,15 @@ func (b *Backend) Start() error {
 		return fmt.Errorf("backend is disabled")
 	}
 
+	// Reset failure state when starting an enabled backend
+	// This ensures a fresh start when re-enabling after failures
+	if err := b.stateStore.ResetFailures(); err != nil {
+		b.api.Log.Warn("Failed to reset failure count on start", "id", b.config.ID, "error", err.Error())
+	}
+	if err := b.stateStore.SaveLastError(""); err != nil {
+		b.api.Log.Warn("Failed to clear last error on start", "id", b.config.ID, "error", err.Error())
+	}
+
 	// Start the poller
 	if err := b.poller.Start(); err != nil {
 		return fmt.Errorf("failed to start poller: %w", err)

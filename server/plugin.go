@@ -130,21 +130,21 @@ func (p *Plugin) createAndStartBackend(config backend.Config) {
 // This is called when a backend reaches MaxConsecutiveFailures and needs to be auto-disabled.
 // The configuration change will trigger OnConfigurationChange, which will stop the backend.
 func (p *Plugin) disableBackend(backendID string) error {
-	p.configurationLock.Lock()
-	defer p.configurationLock.Unlock()
+	// Get the current configuration (handles locking internally)
+	config := p.getConfiguration()
 
-	if p.configuration == nil {
-		return errors.New("configuration is nil")
-	}
+	// Clone it to avoid modifying the active configuration
+	configClone := config.Clone()
 
-	// Find the backend in the configuration
+	// Find the backend in the cloned configuration
 	found := false
-	for i := range p.configuration.Backends {
-		if p.configuration.Backends[i].ID == backendID {
+	var backendName string
+	for i := range configClone.Backends {
+		if configClone.Backends[i].ID == backendID {
 			// Set enabled to false
-			p.configuration.Backends[i].Enabled = false
+			configClone.Backends[i].Enabled = false
+			backendName = configClone.Backends[i].Name
 			found = true
-			p.API.LogInfo("Disabling backend in configuration", "id", backendID, "name", p.configuration.Backends[i].Name)
 			break
 		}
 	}
@@ -153,8 +153,10 @@ func (p *Plugin) disableBackend(backendID string) error {
 		return errors.Errorf("backend with ID %s not found in configuration", backendID)
 	}
 
+	p.API.LogInfo("Disabling backend in configuration", "id", backendID, "name", backendName)
+
 	// Marshal the configuration to map[string]any for SavePluginConfig
-	marshalBytes, err := json.Marshal(p.configuration)
+	marshalBytes, err := json.Marshal(configClone)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal configuration")
 	}
@@ -164,7 +166,7 @@ func (p *Plugin) disableBackend(backendID string) error {
 		return errors.Wrap(err, "failed to unmarshal configuration to map")
 	}
 
-	// Persist the configuration change
+	// Persist the configuration change (this will trigger OnConfigurationChange)
 	if err := p.client.Configuration.SavePluginConfig(configMap); err != nil {
 		return errors.Wrap(err, "failed to save plugin configuration")
 	}

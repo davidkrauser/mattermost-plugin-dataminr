@@ -12,7 +12,7 @@ import (
 	"github.com/mattermost/mattermost-plugin-dataminr/server/backend"
 )
 
-func TestFormatAlert_FullAlert(t *testing.T) {
+func TestFormatMainPost_FullAlert(t *testing.T) {
 	alert := backend.Alert{
 		BackendName:     "Test Backend",
 		AlertID:         "test-123",
@@ -36,7 +36,7 @@ func TestFormatAlert_FullAlert(t *testing.T) {
 		},
 	}
 
-	attachment := FormatAlert(alert)
+	attachment := FormatMainPost(alert)
 
 	// Verify basic structure
 	assert.Equal(t, "#### [Breaking News](https://example.com/alert/123)", attachment.Text)
@@ -44,11 +44,11 @@ func TestFormatAlert_FullAlert(t *testing.T) {
 	assert.Empty(t, attachment.Title)
 	assert.Empty(t, attachment.TitleLink)
 	assert.Equal(t, ColorFlash, attachment.Color)
-	assert.Equal(t, "https://example.com/image1.jpg", attachment.ImageURL)
+	assert.Empty(t, attachment.ImageURL) // No image in main post
 	assert.Equal(t, "Test Backend | Flash", attachment.Footer)
 
-	// Verify fields exist in correct order
-	require.Len(t, attachment.Fields, 9) // All fields with new order and Public Source as last field
+	// Verify only Event Time and Location fields
+	require.Len(t, attachment.Fields, 2)
 
 	// Field 0: Event Time
 	assert.Equal(t, "Event Time", attachment.Fields[0].Title)
@@ -61,46 +61,85 @@ func TestFormatAlert_FullAlert(t *testing.T) {
 	assert.Contains(t, attachment.Fields[1].Value, "(40.712800, -74.006000)")
 	assert.Contains(t, attachment.Fields[1].Value, "±100m")
 	assert.Equal(t, model.SlackCompatibleBool(true), attachment.Fields[1].Short)
-
-	// Field 2: Additional Context
-	assert.Equal(t, "Additional Context", attachment.Fields[2].Title)
-	assert.Equal(t, "Additional important context", attachment.Fields[2].Value)
-	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[2].Short)
-
-	// Field 3: Original Source Text
-	assert.Equal(t, "Original Source Text", attachment.Fields[3].Title)
-	assert.Equal(t, "Original source text here", attachment.Fields[3].Value)
-	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[3].Short)
-
-	// Field 4: Translated Text
-	assert.Equal(t, "Translated Text", attachment.Fields[4].Title)
-	assert.Equal(t, "Translated text here", attachment.Fields[4].Value)
-	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[4].Short)
-
-	// Field 5: Topics
-	assert.Equal(t, "Topics", attachment.Fields[5].Title)
-	assert.Contains(t, attachment.Fields[5].Value, "• Politics")
-	assert.Contains(t, attachment.Fields[5].Value, "• Economy")
-	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[5].Short)
-
-	// Field 6: Alert Lists
-	assert.Equal(t, "Alert Lists", attachment.Fields[6].Title)
-	assert.Contains(t, attachment.Fields[6].Value, "• Critical")
-	assert.Contains(t, attachment.Fields[6].Value, "• Breaking")
-	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[6].Short)
-
-	// Field 7: Additional Media
-	assert.Equal(t, "Additional Media", attachment.Fields[7].Title)
-	assert.Equal(t, "[Media 2](https://example.com/image2.jpg)", attachment.Fields[7].Value)
-	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[7].Short)
-
-	// Field 8: Public Source (last field)
-	assert.Equal(t, "Public Source", attachment.Fields[8].Title)
-	assert.Equal(t, "[Link](https://example.com/source)", attachment.Fields[8].Value)
-	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[8].Short)
 }
 
-func TestFormatAlert_MinimalAlert(t *testing.T) {
+func TestFormatReplyPost_FullAlert(t *testing.T) {
+	alert := backend.Alert{
+		BackendName:     "Test Backend",
+		AlertID:         "test-123",
+		Headline:        "Breaking News",
+		AlertType:       "Flash",
+		EventTime:       time.Date(2025, 10, 30, 14, 30, 0, 0, time.UTC),
+		AlertURL:        "https://example.com/alert/123",
+		SubHeadline:     "Additional important context",
+		Topics:          []string{"Politics", "Economy"},
+		AlertLists:      []string{"Critical", "Breaking"},
+		LinkedAlerts:    []string{"alert-1", "alert-2"},
+		SourceText:      "Original source text here",
+		TranslatedText:  "Translated text here",
+		PublicSourceURL: "https://example.com/source",
+		MediaURLs:       []string{"https://example.com/image1.jpg", "https://example.com/image2.jpg"},
+		Location: &backend.Location{
+			Address:          "123 Main St, City",
+			Latitude:         40.7128,
+			Longitude:        -74.0060,
+			ConfidenceRadius: 100.5,
+		},
+	}
+
+	attachment := FormatReplyPost(alert)
+
+	// Verify basic structure
+	assert.Empty(t, attachment.Text)
+	assert.Empty(t, attachment.Pretext)
+	assert.Empty(t, attachment.Title)
+	assert.Empty(t, attachment.TitleLink)
+	assert.Equal(t, "#D3D3D3", attachment.Color)                           // Light grey color in reply post
+	assert.Equal(t, "https://example.com/image1.jpg", attachment.ImageURL) // Image in reply post
+	assert.Equal(t, "Test Backend | Flash", attachment.Footer)
+
+	// Verify all detail fields exist in correct order
+	require.Len(t, attachment.Fields, 7) // All detail fields
+
+	// Field 0: Additional Context
+	assert.Equal(t, "Additional Context", attachment.Fields[0].Title)
+	assert.Equal(t, "Additional important context", attachment.Fields[0].Value)
+	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[0].Short)
+
+	// Field 1: Original Source Text
+	assert.Equal(t, "Original Source Text", attachment.Fields[1].Title)
+	assert.Equal(t, "Original source text here", attachment.Fields[1].Value)
+	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[1].Short)
+
+	// Field 2: Translated Text
+	assert.Equal(t, "Translated Text", attachment.Fields[2].Title)
+	assert.Equal(t, "Translated text here", attachment.Fields[2].Value)
+	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[2].Short)
+
+	// Field 3: Topics
+	assert.Equal(t, "Topics", attachment.Fields[3].Title)
+	assert.Contains(t, attachment.Fields[3].Value, "• Politics")
+	assert.Contains(t, attachment.Fields[3].Value, "• Economy")
+	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[3].Short)
+
+	// Field 4: Alert Lists
+	assert.Equal(t, "Alert Lists", attachment.Fields[4].Title)
+	assert.Contains(t, attachment.Fields[4].Value, "• Critical")
+	assert.Contains(t, attachment.Fields[4].Value, "• Breaking")
+	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[4].Short)
+
+	// Field 5: Additional Media
+	assert.Equal(t, "Additional Media", attachment.Fields[5].Title)
+	assert.Equal(t, "[Media 2](https://example.com/image2.jpg)", attachment.Fields[5].Value)
+	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[5].Short)
+
+	// Field 6: Public Source (last field)
+	assert.Equal(t, "Public Source", attachment.Fields[6].Title)
+	assert.Equal(t, "[Link](https://example.com/source)", attachment.Fields[6].Value)
+	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[6].Short)
+}
+
+func TestFormatMainPost_MinimalAlert(t *testing.T) {
 	alert := backend.Alert{
 		BackendName: "Test Backend",
 		AlertID:     "test-123",
@@ -109,7 +148,7 @@ func TestFormatAlert_MinimalAlert(t *testing.T) {
 		EventTime:   time.Date(2025, 10, 30, 14, 30, 0, 0, time.UTC),
 	}
 
-	attachment := FormatAlert(alert)
+	attachment := FormatMainPost(alert)
 
 	// Verify basic structure
 	assert.Equal(t, "#### Simple Alert", attachment.Text)
@@ -120,11 +159,35 @@ func TestFormatAlert_MinimalAlert(t *testing.T) {
 	assert.Empty(t, attachment.ImageURL)
 	assert.Equal(t, "Test Backend | Alert", attachment.Footer)
 
-	// Verify only required fields present
-	require.Len(t, attachment.Fields, 1) // Only Event Time
+	// Verify only Event Time field (no Location)
+	require.Len(t, attachment.Fields, 1)
 
 	assert.Equal(t, "Event Time", attachment.Fields[0].Title)
 	assert.Equal(t, "2025-10-30 14:30:00 UTC", attachment.Fields[0].Value)
+}
+
+func TestFormatReplyPost_MinimalAlert(t *testing.T) {
+	alert := backend.Alert{
+		BackendName: "Test Backend",
+		AlertID:     "test-123",
+		Headline:    "Simple Alert",
+		AlertType:   "Alert",
+		EventTime:   time.Date(2025, 10, 30, 14, 30, 0, 0, time.UTC),
+	}
+
+	attachment := FormatReplyPost(alert)
+
+	// Verify basic structure
+	assert.Empty(t, attachment.Text)
+	assert.Empty(t, attachment.Pretext)
+	assert.Empty(t, attachment.Title)
+	assert.Empty(t, attachment.TitleLink)
+	assert.Equal(t, "#D3D3D3", attachment.Color) // Light grey color in reply post
+	assert.Empty(t, attachment.ImageURL)
+	assert.Equal(t, "Test Backend | Alert", attachment.Footer)
+
+	// Verify no fields for minimal alert
+	require.Len(t, attachment.Fields, 0)
 }
 
 func TestGetAlertColor(t *testing.T) {
@@ -370,7 +433,7 @@ func TestFormatMediaLinks(t *testing.T) {
 	}
 }
 
-func TestFormatAlert_MultipleMediaURLs(t *testing.T) {
+func TestFormatReplyPost_MultipleMediaURLs(t *testing.T) {
 	tests := []struct {
 		name                  string
 		mediaURLs             []string
@@ -424,7 +487,7 @@ func TestFormatAlert_MultipleMediaURLs(t *testing.T) {
 				MediaURLs:   tt.mediaURLs,
 			}
 
-			attachment := FormatAlert(alert)
+			attachment := FormatReplyPost(alert)
 
 			assert.Equal(t, tt.expectedImageURL, attachment.ImageURL)
 
@@ -451,7 +514,7 @@ func TestFormatAlert_MultipleMediaURLs(t *testing.T) {
 	}
 }
 
-func TestFormatAlert_AlertTypeVariations(t *testing.T) {
+func TestFormatMainPost_AlertTypeVariations(t *testing.T) {
 	tests := []struct {
 		alertType     string
 		expectedColor string
@@ -480,7 +543,7 @@ func TestFormatAlert_AlertTypeVariations(t *testing.T) {
 				EventTime:   time.Now(),
 			}
 
-			attachment := FormatAlert(alert)
+			attachment := FormatMainPost(alert)
 
 			assert.Equal(t, tt.expectedColor, attachment.Color)
 			assert.Equal(t, "#### Test", attachment.Text) // Text contains headline with markdown H4 header
@@ -488,7 +551,7 @@ func TestFormatAlert_AlertTypeVariations(t *testing.T) {
 	}
 }
 
-func TestFormatAlert_SourceTextTruncation(t *testing.T) {
+func TestFormatReplyPost_SourceTextTruncation(t *testing.T) {
 	longText := strings.Repeat("a", 600)
 
 	alert := backend.Alert{
@@ -501,7 +564,7 @@ func TestFormatAlert_SourceTextTruncation(t *testing.T) {
 		TranslatedText: longText,
 	}
 
-	attachment := FormatAlert(alert)
+	attachment := FormatReplyPost(alert)
 
 	// Find source text and translated text fields
 	var sourceTextField, translatedTextField string

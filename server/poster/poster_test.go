@@ -20,6 +20,7 @@ func TestPostAlert_Success(t *testing.T) {
 
 	botID := "bot-user-id"
 	channelID := "channel-id"
+	mainPostID := "main-post-id"
 
 	// Create test alert
 	alert := backend.Alert{
@@ -30,21 +31,44 @@ func TestPostAlert_Success(t *testing.T) {
 		EventTime:   time.Now(),
 	}
 
-	// Mock CreatePost to succeed
+	// Mock first CreatePost (main post) to succeed
 	api.On("CreatePost", mock.MatchedBy(func(post *model.Post) bool {
-		// Verify post fields
-		assert.Equal(t, botID, post.UserId, "Post should use bot user ID")
-		assert.Equal(t, channelID, post.ChannelId, "Post should target correct channel")
-		assert.Equal(t, model.PostTypeSlackAttachment, post.Type, "Post should be slack_attachment type")
-		assert.NotNil(t, post.Props, "Post should have props")
+		// Verify main post fields
+		if post.RootId != "" {
+			return false // This matcher is for the main post only
+		}
+		assert.Equal(t, botID, post.UserId, "Main post should use bot user ID")
+		assert.Equal(t, channelID, post.ChannelId, "Main post should target correct channel")
+		assert.Equal(t, model.PostTypeSlackAttachment, post.Type, "Main post should be slack_attachment type")
+		assert.NotNil(t, post.Props, "Main post should have props")
 
 		// Verify attachment was added to props
 		attachments, ok := post.Props["attachments"]
-		assert.True(t, ok, "Props should contain attachments")
-		assert.NotNil(t, attachments, "Attachments should not be nil")
+		assert.True(t, ok, "Main post props should contain attachments")
+		assert.NotNil(t, attachments, "Main post attachments should not be nil")
 
 		return true
-	})).Return(&model.Post{}, nil)
+	})).Return(&model.Post{Id: mainPostID}, nil).Once()
+
+	// Mock second CreatePost (reply post) to succeed
+	api.On("CreatePost", mock.MatchedBy(func(post *model.Post) bool {
+		// Verify reply post fields
+		if post.RootId == "" {
+			return false // This matcher is for the reply post only
+		}
+		assert.Equal(t, botID, post.UserId, "Reply post should use bot user ID")
+		assert.Equal(t, channelID, post.ChannelId, "Reply post should target correct channel")
+		assert.Equal(t, mainPostID, post.RootId, "Reply post should have RootId set to main post ID")
+		assert.Equal(t, model.PostTypeSlackAttachment, post.Type, "Reply post should be slack_attachment type")
+		assert.NotNil(t, post.Props, "Reply post should have props")
+
+		// Verify attachment was added to props
+		attachments, ok := post.Props["attachments"]
+		assert.True(t, ok, "Reply post props should contain attachments")
+		assert.NotNil(t, attachments, "Reply post attachments should not be nil")
+
+		return true
+	})).Return(&model.Post{Id: "reply-post-id"}, nil).Once()
 
 	// Create poster and call PostAlert
 	poster := New(api, botID)
@@ -54,7 +78,7 @@ func TestPostAlert_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestPostAlert_CreatePostError(t *testing.T) {
+func TestPostAlert_MainPostError(t *testing.T) {
 	// Create mock API
 	api := &plugintest.API{}
 	defer api.AssertExpectations(t)
@@ -71,12 +95,12 @@ func TestPostAlert_CreatePostError(t *testing.T) {
 		EventTime:   time.Now(),
 	}
 
-	// Mock CreatePost to fail
+	// Mock CreatePost to fail on main post
 	expectedErr := &model.AppError{
 		Id:      "app.post.create.error",
 		Message: "Failed to create post",
 	}
-	api.On("CreatePost", mock.Anything).Return(nil, expectedErr)
+	api.On("CreatePost", mock.Anything).Return(nil, expectedErr).Once()
 
 	// Create poster and call PostAlert
 	poster := New(api, botID)
@@ -85,6 +109,49 @@ func TestPostAlert_CreatePostError(t *testing.T) {
 	// Verify error is returned
 	require.Error(t, err)
 	assert.Equal(t, expectedErr, err)
+}
+
+func TestPostAlert_ReplyPostError(t *testing.T) {
+	// Create mock API
+	api := &plugintest.API{}
+	defer api.AssertExpectations(t)
+
+	botID := "bot-user-id"
+	channelID := "channel-id"
+	mainPostID := "main-post-id"
+
+	// Create test alert
+	alert := backend.Alert{
+		BackendName: "Test Backend",
+		AlertID:     "alert-123",
+		AlertType:   "Urgent",
+		Headline:    "Test Alert",
+		EventTime:   time.Now(),
+	}
+
+	// Mock first CreatePost (main post) to succeed
+	api.On("CreatePost", mock.MatchedBy(func(post *model.Post) bool {
+		return post.RootId == ""
+	})).Return(&model.Post{Id: mainPostID}, nil).Once()
+
+	// Mock second CreatePost (reply post) to fail
+	replyErr := &model.AppError{
+		Id:      "app.post.create.error",
+		Message: "Failed to create reply post",
+	}
+	api.On("CreatePost", mock.MatchedBy(func(post *model.Post) bool {
+		return post.RootId != ""
+	})).Return(nil, replyErr).Once()
+
+	// Mock LogError to be called when reply fails
+	api.On("LogError", "Failed to post alert reply", "error", replyErr.Error(), "alertID", alert.AlertID).Once()
+
+	// Create poster and call PostAlert
+	poster := New(api, botID)
+	err := poster.PostAlert(alert, channelID)
+
+	// Verify NO error is returned (main post succeeded)
+	require.NoError(t, err)
 }
 
 func TestPostAlert_ChannelNotFound(t *testing.T) {
@@ -162,6 +229,7 @@ func TestPostAlert_WithRichAlert(t *testing.T) {
 
 	botID := "bot-user-id"
 	channelID := "channel-id"
+	mainPostID := "main-post-id"
 
 	// Create rich alert with all fields
 	alert := backend.Alert{
@@ -187,20 +255,38 @@ func TestPostAlert_WithRichAlert(t *testing.T) {
 		},
 	}
 
-	// Mock CreatePost to succeed
+	// Mock first CreatePost (main post) to succeed
 	api.On("CreatePost", mock.MatchedBy(func(post *model.Post) bool {
-		// Verify post structure
+		if post.RootId != "" {
+			return false // This matcher is for the main post only
+		}
 		assert.Equal(t, botID, post.UserId)
 		assert.Equal(t, channelID, post.ChannelId)
 		assert.Equal(t, model.PostTypeSlackAttachment, post.Type)
 
-		// Verify attachment was added
 		attachments, ok := post.Props["attachments"]
 		assert.True(t, ok)
 		assert.NotNil(t, attachments)
 
 		return true
-	})).Return(&model.Post{}, nil)
+	})).Return(&model.Post{Id: mainPostID}, nil).Once()
+
+	// Mock second CreatePost (reply post) to succeed
+	api.On("CreatePost", mock.MatchedBy(func(post *model.Post) bool {
+		if post.RootId == "" {
+			return false // This matcher is for the reply post only
+		}
+		assert.Equal(t, botID, post.UserId)
+		assert.Equal(t, channelID, post.ChannelId)
+		assert.Equal(t, mainPostID, post.RootId)
+		assert.Equal(t, model.PostTypeSlackAttachment, post.Type)
+
+		attachments, ok := post.Props["attachments"]
+		assert.True(t, ok)
+		assert.NotNil(t, attachments)
+
+		return true
+	})).Return(&model.Post{Id: "reply-post-id"}, nil).Once()
 
 	// Create poster and call PostAlert
 	poster := New(api, botID)

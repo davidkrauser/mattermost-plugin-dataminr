@@ -460,13 +460,24 @@ server/backend/
 - **Urgent**: Orange (#FF9900) - High priority
 - **Alert**: Yellow (#FFFF00) - Normal priority
 - Unknown: Gray (#808080)
+- **Reply Post**: Light Gray (#D3D3D3) - Used for detail thread replies
 
-**Mattermost Attachment Structure:**
+**Two-Post Structure:**
+
+Alerts are posted as two threaded messages for improved readability:
+
+**Main Post (First Post):**
 - Text: Alert headline as markdown H4 header (linked to AlertURL if available)
-- Color: Alert type color
-- Fields (displayed in order):
+- Color: Alert type color (Red/Orange/Yellow)
+- Fields:
   - Event Time (short field, side by side with Location)
   - Location (address, coordinates, confidence radius) (short field, side by side with Event Time)
+- Footer: Backend name + Alert Type
+- ImageURL: None (image appears in reply)
+
+**Reply Post (Threaded Reply):**
+- Color: Light gray (#D3D3D3)
+- Fields (displayed in order):
   - Additional Context (sub-headline if available)
   - Original Source Text (truncate at 500 chars)
   - Translated Text (truncate at 500 chars)
@@ -475,7 +486,13 @@ server/backend/
   - Additional Media (links to media 2-4)
   - Public Source link (last field)
 - ImageURL: First media item embedded
-- Footer: Backend name + Alert Type
+- Footer: Backend name + Alert Type (same as main post)
+- Threading: RootId set to main post ID
+
+**Implementation Notes:**
+- Main post created first, reply post threaded using RootId
+- If reply post fails, error is logged but main post delivery is considered successful
+- Both posts use SlackAttachment format for rich formatting
 
 ---
 

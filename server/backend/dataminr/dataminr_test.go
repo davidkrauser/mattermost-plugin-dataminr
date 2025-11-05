@@ -339,8 +339,6 @@ func TestDataminrBackend_StartResetsFailureState(t *testing.T) {
 
 	mockAPI := &plugintest.API{}
 	mockAPI.On("LogInfo", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
-	// Mock GetCursor for Start() check (return existing cursor to avoid catch-up)
-	mockAPI.On("KVGet", "backend_test-backend_cursor").Return([]byte("existing-cursor"), nil)
 	// Expect KVSet calls to reset failures and clear error
 	mockAPI.On("KVSet", "backend_test-backend_failures", []byte("0")).Return(nil)
 	mockAPI.On("KVSet", "backend_test-backend_last_error", []byte("")).Return(nil)
@@ -394,8 +392,6 @@ func TestDataminrBackend_Stop(t *testing.T) {
 	t.Run("stop when running", func(t *testing.T) {
 		mockAPI := &plugintest.API{}
 		mockAPI.On("LogInfo", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
-		// Mock GetCursor for Start() check (return existing cursor to avoid catch-up)
-		mockAPI.On("KVGet", "backend_test-backend_cursor").Return([]byte("existing-cursor"), nil)
 		// Expect KVSet calls when Start resets failure state
 		mockAPI.On("KVSet", "backend_test-backend_failures", []byte("0")).Return(nil)
 		mockAPI.On("KVSet", "backend_test-backend_last_error", []byte("")).Return(nil)

@@ -1,7 +1,6 @@
 package dataminr
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -29,7 +28,6 @@ type Poller struct {
 	scheduler       JobScheduler
 	job             Job
 	disableCallback backend.DisableCallback
-	catchUpCancel   context.CancelFunc // Cancels catch-up goroutine if running
 }
 
 // NewPoller creates a new poller instance
@@ -64,34 +62,11 @@ func (p *Poller) SetScheduler(scheduler JobScheduler) {
 
 // Start begins the polling job using Mattermost's cluster job system
 // This ensures only one server instance polls in a multi-server cluster
-// If no cursor exists, runs a catch-up routine first to skip historical alerts
 func (p *Poller) Start() error {
 	if p.job != nil {
 		return fmt.Errorf("poller already running")
 	}
 
-	// Check if we need to catch up (no cursor = first time)
-	cursor, err := p.stateStore.GetCursor()
-	if err != nil {
-		return fmt.Errorf("failed to check cursor state: %w", err)
-	}
-
-	if cursor == "" {
-		// No cursor exists - need to catch up to avoid posting historical alerts
-		p.api.Log.Info("No cursor found - starting catch-up routine to skip historical alerts",
-			"backendId", p.backendID,
-			"backendName", p.backendName)
-
-		// Create cancellable context for catch-up
-		ctx, cancel := context.WithCancel(context.Background())
-		p.catchUpCancel = cancel
-
-		// Run catch-up in background, then start regular job
-		go p.catchUp(ctx)
-		return nil
-	}
-
-	// Cursor exists - start regular polling immediately
 	return p.startRegularJob()
 }
 
@@ -110,133 +85,8 @@ func (p *Poller) startRegularJob() error {
 	return nil
 }
 
-// catchUp fetches historical alerts until we reach alerts within 24 hours
-// This runs in a background goroutine and does NOT post any alerts
-// Once caught up, it starts the regular polling job
-func (p *Poller) catchUp(ctx context.Context) {
-	p.api.Log.Info("Catch-up routine started",
-		"backendId", p.backendID,
-		"backendName", p.backendName)
-
-	cursor := ""
-	twentyFourHoursAgo := time.Now().Add(-24 * time.Hour)
-	totalSkipped := 0
-
-	for {
-		// Update last poll time before making API call
-		if err := p.stateStore.SaveLastPoll(time.Now()); err != nil {
-			p.api.Log.Error("Failed to save last poll time during catch-up",
-				"backendId", p.backendID,
-				"error", err.Error())
-		}
-
-		// Fetch alerts with current cursor
-		response, err := p.client.FetchAlerts(cursor)
-		if err != nil {
-			p.api.Log.Error("Catch-up failed - disabling backend",
-				"backendId", p.backendID,
-				"backendName", p.backendName,
-				"error", err.Error())
-			p.handlePollError(fmt.Errorf("catch-up failed: %w", err))
-			return
-		}
-
-		// Check if any alerts are within 24 hours
-		foundRecent := false
-		for _, alert := range response.Alerts {
-			if alert.EventTime.After(twentyFourHoursAgo) {
-				foundRecent = true
-				break
-			}
-		}
-
-		totalSkipped += len(response.Alerts)
-
-		// Save cursor after each successful fetch
-		if response.To != "" {
-			cursor = response.To
-			if err := p.stateStore.SaveCursor(cursor); err != nil {
-				p.api.Log.Error("Failed to save cursor during catch-up",
-					"backendId", p.backendID,
-					"error", err.Error())
-			}
-		}
-
-		// Update last success time on successful fetch
-		if err := p.stateStore.SaveLastSuccess(time.Now()); err != nil {
-			p.api.Log.Error("Failed to save last success time during catch-up",
-				"backendId", p.backendID,
-				"error", err.Error())
-		}
-
-		// Reset failure counter on successful fetch (same as regular polling)
-		if err := p.stateStore.ResetFailures(); err != nil {
-			p.api.Log.Error("Failed to reset failure counter during catch-up",
-				"backendId", p.backendID,
-				"error", err.Error())
-		}
-
-		// Clear last error on success
-		if err := p.stateStore.SaveLastError(""); err != nil {
-			p.api.Log.Error("Failed to clear last error during catch-up",
-				"backendId", p.backendID,
-				"error", err.Error())
-		}
-
-		// If we found a recent alert, we're caught up
-		if foundRecent {
-			p.api.Log.Info("Catch-up complete - found recent alerts",
-				"backendId", p.backendID,
-				"backendName", p.backendName,
-				"totalSkipped", totalSkipped)
-			break
-		}
-
-		// If no more alerts, we're at the end
-		if len(response.Alerts) == 0 {
-			p.api.Log.Info("Catch-up complete - reached end of historical alerts",
-				"backendId", p.backendID,
-				"backendName", p.backendName,
-				"totalSkipped", totalSkipped)
-			break
-		}
-
-		// Wait 5 seconds before next request (rate limiting)
-		// Use context-aware sleep to allow cancellation
-		p.api.Log.Debug("Catch-up progress",
-			"backendId", p.backendID,
-			"alertsInBatch", len(response.Alerts),
-			"totalSkipped", totalSkipped)
-
-		select {
-		case <-ctx.Done():
-			p.api.Log.Info("Catch-up routine canceled",
-				"backendId", p.backendID,
-				"backendName", p.backendName)
-			return
-		case <-time.After(5 * time.Second):
-			// Continue to next iteration
-		}
-	}
-
-	// Start the regular polling job
-	if err := p.startRegularJob(); err != nil {
-		p.api.Log.Error("Failed to start regular job after catch-up",
-			"backendId", p.backendID,
-			"error", err.Error())
-		p.handlePollError(fmt.Errorf("failed to start job after catch-up: %w", err))
-	}
-}
-
-// Stop gracefully stops the polling job and cancels catch-up if running
+// Stop gracefully stops the polling job
 func (p *Poller) Stop() error {
-	// Cancel catch-up routine if running
-	if p.catchUpCancel != nil {
-		p.catchUpCancel()
-		p.catchUpCancel = nil
-	}
-
-	// Stop regular job if running
 	if p.job == nil {
 		return nil
 	}

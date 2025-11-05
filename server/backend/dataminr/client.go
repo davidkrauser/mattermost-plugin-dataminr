@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/mattermost/mattermost/server/public/pluginapi"
@@ -42,7 +43,7 @@ func (c *APIClient) FetchAlerts(cursor string) (*AlertsResponse, error) {
 	// Build request URL with hardcoded alertversion=19
 	alertsURL := fmt.Sprintf("%s/alerts/1/alerts?alertversion=19", c.baseURL)
 	if cursor != "" {
-		alertsURL += fmt.Sprintf("&from=%s", cursor)
+		alertsURL += fmt.Sprintf("&from=%s", url.QueryEscape(cursor))
 	}
 
 	req, err := http.NewRequest(http.MethodGet, alertsURL, nil)

@@ -456,10 +456,10 @@ server/backend/
 ### 6.1 Formatting Requirements
 
 **Color Coding by Alert Type:**
-- **Flash**: Red (#FF0000) - Breaking news, highest priority
-- **Urgent**: Orange (#FF9900) - High priority
-- **Alert**: Yellow (#FFFF00) - Normal priority
-- Unknown: Gray (#808080)
+- **Flash**: Red (#D24B4E) - Breaking news, highest priority
+- **Urgent**: Orange (#EC8832) - High priority
+- **Alert**: Yellow (#FFBC1F) - Normal priority
+- Unknown: Light Gray (#D3D3D3)
 - **Reply Post**: Light Gray (#D3D3D3) - Used for detail thread replies
 
 **Two-Post Structure:**
@@ -467,7 +467,7 @@ server/backend/
 Alerts are posted as two threaded messages for improved readability:
 
 **Main Post (First Post):**
-- Text: Alert headline as markdown H4 header (linked to AlertURL if available)
+- Text: Alert headline as markdown H3 header (linked to AlertURL if available)
 - Color: Alert type color (Red/Orange/Yellow)
 - Fields:
   - Event Time (short field, side by side with Location)
@@ -610,9 +610,9 @@ Response: {"alerts": [...], "to": "cursor"}
 - Cursor-based pagination required
 
 **Alert Types:**
-- **Flash** - Red (#FF0000) - Breaking news
-- **Urgent** - Orange (#FF9900) - High priority
-- **Alert** - Yellow (#FFFF00) - Normal
+- **Flash** - Red (#D24B4E) - Breaking news
+- **Urgent** - Orange (#EC8832) - High priority
+- **Alert** - Yellow (#FFBC1F) - Normal
 
 ---
 

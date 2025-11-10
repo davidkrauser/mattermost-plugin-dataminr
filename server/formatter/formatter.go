@@ -12,10 +12,10 @@ import (
 
 // Alert type colors
 const (
-	ColorFlash   = "#FF0000" // Red 🔴
-	ColorUrgent  = "#FF9900" // Orange 🟠
-	ColorAlert   = "#FFFF00" // Yellow 🟡
-	ColorUnknown = "#808080" // Gray ⚪
+	ColorFlash   = "#D24B4E" // Red 🔴
+	ColorUrgent  = "#EC8832" // Orange 🟠
+	ColorAlert   = "#FFBC1F" // Yellow 🟡
+	ColorUnknown = "#D3D3D3" // Light Gray ⚪
 )
 
 // Alert type emojis
@@ -31,11 +31,11 @@ const (
 func FormatMainPost(alert backend.Alert) *model.SlackAttachment {
 	attachment := &model.SlackAttachment{}
 
-	// Set text with title (with optional link) - use markdown H4 header for emphasis
+	// Set text with title - use markdown H3 header for emphasis
 	if alert.AlertURL != "" {
-		attachment.Text = fmt.Sprintf("#### [%s](%s)", alert.Headline, alert.AlertURL)
+		attachment.Text = fmt.Sprintf("### %s\n\n[View more details](%s)", alert.Headline, alert.AlertURL)
 	} else {
-		attachment.Text = fmt.Sprintf("#### %s", alert.Headline)
+		attachment.Text = fmt.Sprintf("### %s", alert.Headline)
 	}
 
 	// Set color based on alert type

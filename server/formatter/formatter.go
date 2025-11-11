@@ -26,9 +26,8 @@ const (
 	EmojiUnknown = "⚪"
 )
 
-// FormatMainPost creates the main alert post attachment with headline, event time, location, and color.
-// This is the first post in a two-post alert display.
-func FormatMainPost(alert backend.Alert) *model.SlackAttachment {
+// FormatAlert creates a single alert post attachment with all alert information.
+func FormatAlert(alert backend.Alert) *model.SlackAttachment {
 	attachment := &model.SlackAttachment{}
 
 	// Set text with title - use markdown H3 header for emphasis
@@ -41,9 +40,10 @@ func FormatMainPost(alert backend.Alert) *model.SlackAttachment {
 	// Set color based on alert type
 	attachment.Color = getAlertColor(alert.AlertType)
 
-	// Build fields: Event Time + Location (side by side)
+	// Build all fields
 	var fields []*model.SlackAttachmentField
 
+	// Event Time and Location (side by side)
 	fields = append(fields,
 		&model.SlackAttachmentField{
 			Title: "Event Time",
@@ -52,7 +52,6 @@ func FormatMainPost(alert backend.Alert) *model.SlackAttachment {
 		},
 	)
 
-	// Location next to Event Time
 	if alert.Location != nil && alert.Location.Address != "" {
 		fields = append(fields, &model.SlackAttachmentField{
 			Title: "Location",
@@ -61,26 +60,7 @@ func FormatMainPost(alert backend.Alert) *model.SlackAttachment {
 		})
 	}
 
-	attachment.Fields = fields
-
-	// Set footer: Backend name + Alert Type
-	attachment.Footer = fmt.Sprintf("%s | %s", alert.BackendName, alert.AlertType)
-
-	return attachment
-}
-
-// FormatReplyPost creates the reply post attachment with detailed information and embedded media.
-// This is the second post in a two-post alert display, threaded as a reply to the main post.
-func FormatReplyPost(alert backend.Alert) *model.SlackAttachment {
-	attachment := &model.SlackAttachment{}
-
-	// Set light grey color for reply post
-	attachment.Color = "#D3D3D3"
-
-	// Build fields with all detail information
-	var fields []*model.SlackAttachmentField
-
-	// 1. Additional Context (sub-headline if available)
+	// Additional Context (sub-headline if available)
 	if alert.SubHeadline != "" {
 		fields = append(fields, &model.SlackAttachmentField{
 			Title: "Additional Context",
@@ -89,7 +69,7 @@ func FormatReplyPost(alert backend.Alert) *model.SlackAttachment {
 		})
 	}
 
-	// 2. Original Source Text (truncate at 500 chars)
+	// Original Source Text (truncate at 500 chars)
 	if alert.SourceText != "" {
 		fields = append(fields, &model.SlackAttachmentField{
 			Title: "Original Source Text",
@@ -98,7 +78,7 @@ func FormatReplyPost(alert backend.Alert) *model.SlackAttachment {
 		})
 	}
 
-	// 3. Translated Text (truncate at 500 chars)
+	// Translated Text (truncate at 500 chars)
 	if alert.TranslatedText != "" {
 		fields = append(fields, &model.SlackAttachmentField{
 			Title: "Translated Text",
@@ -107,7 +87,7 @@ func FormatReplyPost(alert backend.Alert) *model.SlackAttachment {
 		})
 	}
 
-	// 4. Topics (bulleted list, full width)
+	// Topics (bulleted list, full width)
 	if len(alert.Topics) > 0 {
 		fields = append(fields, &model.SlackAttachmentField{
 			Title: "Topics",
@@ -116,7 +96,7 @@ func FormatReplyPost(alert backend.Alert) *model.SlackAttachment {
 		})
 	}
 
-	// 5. Alert Lists (bulleted list, full width)
+	// Alert Lists (bulleted list, full width)
 	if len(alert.AlertLists) > 0 {
 		fields = append(fields, &model.SlackAttachmentField{
 			Title: "Alert Lists",
@@ -125,7 +105,7 @@ func FormatReplyPost(alert backend.Alert) *model.SlackAttachment {
 		})
 	}
 
-	// 6. Additional Media (links to media 2-4)
+	// Additional Media (links to media 2-4)
 	if len(alert.MediaURLs) > 1 {
 		additionalMedia := alert.MediaURLs[1:]
 		if len(additionalMedia) > 3 {
@@ -138,7 +118,7 @@ func FormatReplyPost(alert backend.Alert) *model.SlackAttachment {
 		})
 	}
 
-	// 7. Public Source link (last field)
+	// Public Source link (last field)
 	if alert.PublicSourceURL != "" {
 		fields = append(fields, &model.SlackAttachmentField{
 			Title: "Public Source",
@@ -149,12 +129,12 @@ func FormatReplyPost(alert backend.Alert) *model.SlackAttachment {
 
 	attachment.Fields = fields
 
-	// Set image URL: First media item embedded in reply
+	// Set image URL: First media item embedded
 	if len(alert.MediaURLs) > 0 {
 		attachment.ImageURL = alert.MediaURLs[0]
 	}
 
-	// Set footer: Backend name + Alert Type (same as main post)
+	// Set footer: Backend name + Alert Type
 	attachment.Footer = fmt.Sprintf("%s | %s", alert.BackendName, alert.AlertType)
 
 	return attachment

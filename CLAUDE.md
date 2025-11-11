@@ -460,39 +460,31 @@ server/backend/
 - **Urgent**: Orange (#EC8832) - High priority
 - **Alert**: Yellow (#FFBC1F) - Normal priority
 - Unknown: Light Gray (#D3D3D3)
-- **Reply Post**: Light Gray (#D3D3D3) - Used for detail thread replies
 
-**Two-Post Structure:**
+**Single-Post Structure:**
 
-Alerts are posted as two threaded messages for improved readability:
+Alerts are posted as a single message containing all alert information:
 
-**Main Post (First Post):**
+**Alert Post:**
 - Text: Alert headline as markdown H3 header (linked to AlertURL if available)
-- Color: Alert type color (Red/Orange/Yellow)
-- Fields:
+- Color: Alert type color (Red/Orange/Yellow/Gray)
+- Fields (displayed in order):
   - Event Time (short field, side by side with Location)
   - Location (address, coordinates, confidence radius) (short field, side by side with Event Time)
-- Footer: Backend name + Alert Type
-- ImageURL: None (image appears in reply)
-
-**Reply Post (Threaded Reply):**
-- Color: Light gray (#D3D3D3)
-- Fields (displayed in order):
-  - Additional Context (sub-headline if available)
-  - Original Source Text (truncate at 500 chars)
-  - Translated Text (truncate at 500 chars)
+  - Additional Context (sub-headline if available) (full width)
+  - Original Source Text (truncate at 500 chars) (full width)
+  - Translated Text (truncate at 500 chars) (full width)
   - Topics (bulleted list, full width)
   - Alert Lists (bulleted list, full width)
-  - Additional Media (links to media 2-4)
-  - Public Source link (last field)
+  - Additional Media (links to media 2-4) (full width)
+  - Public Source link (last field) (full width)
 - ImageURL: First media item embedded
-- Footer: Backend name + Alert Type (same as main post)
-- Threading: RootId set to main post ID
+- Footer: Backend name + Alert Type
 
 **Implementation Notes:**
-- Main post created first, reply post threaded using RootId
-- If reply post fails, error is logged but main post delivery is considered successful
-- Both posts use SlackAttachment format for rich formatting
+- Single post created with all fields included
+- Uses SlackAttachment format for rich formatting
+- If post fails, error is returned to caller
 
 ---
 

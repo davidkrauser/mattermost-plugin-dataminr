@@ -31,17 +31,31 @@ func FormatAlert(alert backend.Alert) *model.SlackAttachment {
 	attachment := &model.SlackAttachment{}
 
 	// Set text with title - use markdown H3 header for emphasis
-	if alert.AlertURL != "" {
-		attachment.Text = fmt.Sprintf("### %s\n\n[View more details](%s)", alert.Headline, alert.AlertURL)
-	} else {
-		attachment.Text = fmt.Sprintf("### %s", alert.Headline)
-	}
+	attachment.Text = fmt.Sprintf("### %s", alert.Headline)
 
 	// Set color based on alert type
 	attachment.Color = getAlertColor(alert.AlertType)
 
 	// Build all fields
 	var fields []*model.SlackAttachmentField
+
+	// Alert Type and Alert Link (side by side at top)
+	alertTypeValue := fmt.Sprintf("%s %s", getAlertEmoji(alert.AlertType), strings.ToUpper(alert.AlertType))
+	fields = append(fields,
+		&model.SlackAttachmentField{
+			Title: "Alert Type",
+			Value: alertTypeValue,
+			Short: true,
+		},
+	)
+
+	if alert.AlertURL != "" {
+		fields = append(fields, &model.SlackAttachmentField{
+			Title: "Alert Link",
+			Value: fmt.Sprintf("[View Alert](%s)", alert.AlertURL),
+			Short: true,
+		})
+	}
 
 	// Event Time and Location (side by side)
 	fields = append(fields,
@@ -134,8 +148,8 @@ func FormatAlert(alert backend.Alert) *model.SlackAttachment {
 		attachment.ImageURL = alert.MediaURLs[0]
 	}
 
-	// Set footer: Backend name + Alert Type
-	attachment.Footer = fmt.Sprintf("%s | %s", alert.BackendName, alert.AlertType)
+	// Set footer: Backend name
+	attachment.Footer = alert.BackendName
 
 	return attachment
 }

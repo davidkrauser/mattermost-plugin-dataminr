@@ -466,9 +466,11 @@ server/backend/
 Alerts are posted as a single message containing all alert information:
 
 **Alert Post:**
-- Text: Alert headline as markdown H3 header (linked to AlertURL if available)
+- Text: Alert headline as markdown H3 header
 - Color: Alert type color (Red/Orange/Yellow/Gray)
 - Fields (displayed in order):
+  - Alert Type (short field, side by side with Alert Link): Colored circle emoji + ALL CAPS alert type string (e.g., "🔴 FLASH", "🟠 URGENT", "🟡 ALERT", "⚪ UNKNOWN")
+  - Alert Link (short field, side by side with Alert Type): Link to view full alert on Dataminr platform (if AlertURL is available)
   - Event Time (short field, side by side with Location)
   - Location (address, coordinates, confidence radius) (short field, side by side with Event Time)
   - Additional Context (sub-headline if available) (full width)
@@ -479,7 +481,7 @@ Alerts are posted as a single message containing all alert information:
   - Additional Media (links to media 2-4) (full width)
   - Public Source link (last field) (full width)
 - ImageURL: First media item embedded
-- Footer: Backend name + Alert Type
+- Footer: Backend name
 
 **Implementation Notes:**
 - Single post created with all fields included

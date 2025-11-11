@@ -40,65 +40,75 @@ func TestFormatAlert_FullAlert(t *testing.T) {
 
 	// Verify basic structure
 	assert.Contains(t, attachment.Text, "Breaking News")
-	assert.Contains(t, attachment.Text, "https://example.com/alert/123")
+	assert.NotContains(t, attachment.Text, "https://example.com/alert/123")
 	assert.Empty(t, attachment.Pretext)
 	assert.Empty(t, attachment.Title)
 	assert.Empty(t, attachment.TitleLink)
 	assert.Equal(t, ColorFlash, attachment.Color)
 	assert.Equal(t, "https://example.com/image1.jpg", attachment.ImageURL)
-	assert.Equal(t, "Test Backend | Flash", attachment.Footer)
+	assert.Equal(t, "Test Backend", attachment.Footer)
 
 	// Verify all fields exist in correct order
-	require.Len(t, attachment.Fields, 9)
+	require.Len(t, attachment.Fields, 11)
 
-	// Field 0: Event Time
-	assert.Equal(t, "Event Time", attachment.Fields[0].Title)
-	assert.Equal(t, "2025-10-30 14:30:00 UTC", attachment.Fields[0].Value)
+	// Field 0: Alert Type
+	assert.Equal(t, "Alert Type", attachment.Fields[0].Title)
+	assert.Equal(t, "🔴 FLASH", attachment.Fields[0].Value)
 	assert.Equal(t, model.SlackCompatibleBool(true), attachment.Fields[0].Short)
 
-	// Field 1: Location
-	assert.Equal(t, "Location", attachment.Fields[1].Title)
-	assert.Contains(t, attachment.Fields[1].Value, "123 Main St, City")
-	assert.Contains(t, attachment.Fields[1].Value, "(40.712800, -74.006000)")
-	assert.Contains(t, attachment.Fields[1].Value, "±100m")
+	// Field 1: Alert Link
+	assert.Equal(t, "Alert Link", attachment.Fields[1].Title)
+	assert.Equal(t, "[View Alert](https://example.com/alert/123)", attachment.Fields[1].Value)
 	assert.Equal(t, model.SlackCompatibleBool(true), attachment.Fields[1].Short)
 
-	// Field 2: Additional Context
-	assert.Equal(t, "Additional Context", attachment.Fields[2].Title)
-	assert.Equal(t, "Additional important context", attachment.Fields[2].Value)
-	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[2].Short)
+	// Field 2: Event Time
+	assert.Equal(t, "Event Time", attachment.Fields[2].Title)
+	assert.Equal(t, "2025-10-30 14:30:00 UTC", attachment.Fields[2].Value)
+	assert.Equal(t, model.SlackCompatibleBool(true), attachment.Fields[2].Short)
 
-	// Field 3: Original Source Text
-	assert.Equal(t, "Original Source Text", attachment.Fields[3].Title)
-	assert.Equal(t, "Original source text here", attachment.Fields[3].Value)
-	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[3].Short)
+	// Field 3: Location
+	assert.Equal(t, "Location", attachment.Fields[3].Title)
+	assert.Contains(t, attachment.Fields[3].Value, "123 Main St, City")
+	assert.Contains(t, attachment.Fields[3].Value, "(40.712800, -74.006000)")
+	assert.Contains(t, attachment.Fields[3].Value, "±100m")
+	assert.Equal(t, model.SlackCompatibleBool(true), attachment.Fields[3].Short)
 
-	// Field 4: Translated Text
-	assert.Equal(t, "Translated Text", attachment.Fields[4].Title)
-	assert.Equal(t, "Translated text here", attachment.Fields[4].Value)
+	// Field 4: Additional Context
+	assert.Equal(t, "Additional Context", attachment.Fields[4].Title)
+	assert.Equal(t, "Additional important context", attachment.Fields[4].Value)
 	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[4].Short)
 
-	// Field 5: Topics
-	assert.Equal(t, "Topics", attachment.Fields[5].Title)
-	assert.Contains(t, attachment.Fields[5].Value, "• Politics")
-	assert.Contains(t, attachment.Fields[5].Value, "• Economy")
+	// Field 5: Original Source Text
+	assert.Equal(t, "Original Source Text", attachment.Fields[5].Title)
+	assert.Equal(t, "Original source text here", attachment.Fields[5].Value)
 	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[5].Short)
 
-	// Field 6: Alert Lists
-	assert.Equal(t, "Alert Lists", attachment.Fields[6].Title)
-	assert.Contains(t, attachment.Fields[6].Value, "• Critical")
-	assert.Contains(t, attachment.Fields[6].Value, "• Breaking")
+	// Field 6: Translated Text
+	assert.Equal(t, "Translated Text", attachment.Fields[6].Title)
+	assert.Equal(t, "Translated text here", attachment.Fields[6].Value)
 	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[6].Short)
 
-	// Field 7: Additional Media
-	assert.Equal(t, "Additional Media", attachment.Fields[7].Title)
-	assert.Equal(t, "[Media 2](https://example.com/image2.jpg)", attachment.Fields[7].Value)
+	// Field 7: Topics
+	assert.Equal(t, "Topics", attachment.Fields[7].Title)
+	assert.Contains(t, attachment.Fields[7].Value, "• Politics")
+	assert.Contains(t, attachment.Fields[7].Value, "• Economy")
 	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[7].Short)
 
-	// Field 8: Public Source (last field)
-	assert.Equal(t, "Public Source", attachment.Fields[8].Title)
-	assert.Equal(t, "[Link](https://example.com/source)", attachment.Fields[8].Value)
+	// Field 8: Alert Lists
+	assert.Equal(t, "Alert Lists", attachment.Fields[8].Title)
+	assert.Contains(t, attachment.Fields[8].Value, "• Critical")
+	assert.Contains(t, attachment.Fields[8].Value, "• Breaking")
 	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[8].Short)
+
+	// Field 9: Additional Media
+	assert.Equal(t, "Additional Media", attachment.Fields[9].Title)
+	assert.Equal(t, "[Media 2](https://example.com/image2.jpg)", attachment.Fields[9].Value)
+	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[9].Short)
+
+	// Field 10: Public Source (last field)
+	assert.Equal(t, "Public Source", attachment.Fields[10].Title)
+	assert.Equal(t, "[Link](https://example.com/source)", attachment.Fields[10].Value)
+	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[10].Short)
 }
 
 func TestFormatAlert_MinimalAlert(t *testing.T) {
@@ -119,13 +129,20 @@ func TestFormatAlert_MinimalAlert(t *testing.T) {
 	assert.Empty(t, attachment.TitleLink)
 	assert.Equal(t, ColorAlert, attachment.Color)
 	assert.Empty(t, attachment.ImageURL)
-	assert.Equal(t, "Test Backend | Alert", attachment.Footer)
+	assert.Equal(t, "Test Backend", attachment.Footer)
 
-	// Verify only Event Time field (no Location or other optional fields)
-	require.Len(t, attachment.Fields, 1)
+	// Verify Alert Type and Event Time fields (no Alert Link since no AlertURL)
+	require.Len(t, attachment.Fields, 2)
 
-	assert.Equal(t, "Event Time", attachment.Fields[0].Title)
-	assert.Equal(t, "2025-10-30 14:30:00 UTC", attachment.Fields[0].Value)
+	// Field 0: Alert Type
+	assert.Equal(t, "Alert Type", attachment.Fields[0].Title)
+	assert.Equal(t, "🟡 ALERT", attachment.Fields[0].Value)
+	assert.Equal(t, model.SlackCompatibleBool(true), attachment.Fields[0].Short)
+
+	// Field 1: Event Time
+	assert.Equal(t, "Event Time", attachment.Fields[1].Title)
+	assert.Equal(t, "2025-10-30 14:30:00 UTC", attachment.Fields[1].Value)
+	assert.Equal(t, model.SlackCompatibleBool(true), attachment.Fields[1].Short)
 }
 
 func TestGetAlertColor(t *testing.T) {

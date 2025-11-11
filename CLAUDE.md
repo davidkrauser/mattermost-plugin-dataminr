@@ -1,6 +1,6 @@
 # Mattermost Dataminr Plugin - Technical Specification
 
-**Version:** 0.9.0
+**Version:** 0.9.1
 **Date:** 2025-11-05
 **Status:** Active Development
 

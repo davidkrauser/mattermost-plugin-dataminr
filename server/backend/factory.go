@@ -13,12 +13,20 @@ type AlertPoster interface {
 	PostAlert(alert Alert, channelID string) error
 }
 
+// Deduplicator is an interface for tracking seen alert IDs across all backends.
+// This allows backends to prevent duplicate alert processing without managing their own caches.
+type Deduplicator interface {
+	// RecordAlert atomically checks if an alert is new and marks it as seen if so.
+	// Returns true if this is a new alert (successfully recorded), false if it's a duplicate.
+	RecordAlert(backendType, alertID string) bool
+}
+
 // DisableCallback is a function type for disabling a backend when it reaches MaxConsecutiveFailures.
 // The callback receives the backend ID and should persist the configuration change.
 type DisableCallback func(backendID string) error
 
 // Factory is a function type that creates a backend instance
-type Factory func(config Config, api *pluginapi.Client, papi plugin.API, poster AlertPoster, disableCallback DisableCallback) (Backend, error)
+type Factory func(config Config, api *pluginapi.Client, papi plugin.API, poster AlertPoster, deduplicator Deduplicator, disableCallback DisableCallback) (Backend, error)
 
 // factoryRegistry maps backend types to their factory functions
 var factoryRegistry = make(map[string]Factory)
@@ -31,7 +39,7 @@ func RegisterBackendFactory(backendType string, factory Factory) {
 
 // Create creates a new backend instance based on the provided configuration.
 // Returns an error if the backend type is unknown or if creation fails.
-func Create(config Config, api *pluginapi.Client, papi plugin.API, poster AlertPoster, disableCallback DisableCallback) (Backend, error) {
+func Create(config Config, api *pluginapi.Client, papi plugin.API, poster AlertPoster, deduplicator Deduplicator, disableCallback DisableCallback) (Backend, error) {
 	if config.Type == "" {
 		return nil, fmt.Errorf("backend type is required")
 	}
@@ -41,5 +49,5 @@ func Create(config Config, api *pluginapi.Client, papi plugin.API, poster AlertP
 		return nil, fmt.Errorf("unknown backend type: %s", config.Type)
 	}
 
-	return factory(config, api, papi, poster, disableCallback)
+	return factory(config, api, papi, poster, deduplicator, disableCallback)
 }

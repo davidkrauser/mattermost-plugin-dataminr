@@ -1,6 +1,7 @@
-package dataminr
+package main
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -9,13 +10,13 @@ import (
 
 const (
 	// DeduplicationCacheTTL is how long to keep alert IDs in the deduplication cache
-	DeduplicationCacheTTL = 1 * time.Hour
+	DeduplicationCacheTTL = 24 * time.Hour
 
 	// DeduplicationCleanupInterval is how often to clean up expired entries
 	DeduplicationCleanupInterval = 10 * time.Minute
 )
 
-// Deduplicator tracks seen alert IDs to prevent duplicate processing
+// Deduplicator tracks seen alert IDs to prevent duplicate processing across all backends
 type Deduplicator struct {
 	api         *pluginapi.Client
 	seenAlerts  map[string]time.Time
@@ -38,21 +39,28 @@ func NewDeduplicator(api *pluginapi.Client) *Deduplicator {
 	return d
 }
 
-// IsDuplicate checks if an alert has already been seen
-func (d *Deduplicator) IsDuplicate(alertID string) bool {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-
-	_, exists := d.seenAlerts[alertID]
-	return exists
-}
-
-// MarkSeen marks an alert as seen
-func (d *Deduplicator) MarkSeen(alertID string) {
+// RecordAlert atomically checks if an alert is new and marks it as seen if so.
+// Returns true if this is a new alert (successfully recorded), false if it's a duplicate.
+// This operation is atomic to prevent race conditions between checking and marking.
+func (d *Deduplicator) RecordAlert(backendType, alertID string) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	d.seenAlerts[alertID] = time.Now()
+	namespacedID := d.namespaceAlertID(backendType, alertID)
+
+	// Check if already seen
+	if _, exists := d.seenAlerts[namespacedID]; exists {
+		return false // Duplicate
+	}
+
+	// Mark as seen
+	d.seenAlerts[namespacedID] = time.Now()
+	return true // New alert
+}
+
+// namespaceAlertID creates a namespaced alert ID to prevent collisions between backend types
+func (d *Deduplicator) namespaceAlertID(backendType, alertID string) string {
+	return fmt.Sprintf("%s:%s", backendType, alertID)
 }
 
 // cleanupLoop periodically removes expired entries from the cache

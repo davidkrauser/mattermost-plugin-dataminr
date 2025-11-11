@@ -13,8 +13,8 @@ import (
 
 // init registers the Dataminr backend factory
 func init() {
-	backend.RegisterBackendFactory("dataminr", func(config backend.Config, api *pluginapi.Client, papi plugin.API, poster backend.AlertPoster, disableCallback backend.DisableCallback) (backend.Backend, error) {
-		return New(config, api, papi, poster, disableCallback)
+	backend.RegisterBackendFactory("dataminr", func(config backend.Config, api *pluginapi.Client, papi plugin.API, poster backend.AlertPoster, deduplicator backend.Deduplicator, disableCallback backend.DisableCallback) (backend.Backend, error) {
+		return New(config, api, papi, poster, deduplicator, disableCallback)
 	})
 }
 
@@ -34,7 +34,7 @@ type Backend struct {
 }
 
 // New creates a new Dataminr backend instance
-func New(config backend.Config, api *pluginapi.Client, papi plugin.API, poster backend.AlertPoster, disableCallback backend.DisableCallback) (*Backend, error) {
+func New(config backend.Config, api *pluginapi.Client, papi plugin.API, poster backend.AlertPoster, deduplicator backend.Deduplicator, disableCallback backend.DisableCallback) (*Backend, error) {
 	// Validate configuration
 	if config.Type != "dataminr" {
 		return nil, fmt.Errorf("invalid backend type: %s (expected: dataminr)", config.Type)
@@ -83,8 +83,8 @@ func New(config backend.Config, api *pluginapi.Client, papi plugin.API, poster b
 		running:     false,
 	}
 
-	// Create alert processor with poster and channel ID
-	b.processor = NewAlertProcessor(api, config.Name, poster, config.ChannelID)
+	// Create alert processor with poster, channel ID, and shared deduplicator
+	b.processor = NewAlertProcessor(api, config.Type, config.Name, poster, config.ChannelID, deduplicator)
 
 	// Create poller
 	pollInterval := time.Duration(config.PollIntervalSeconds) * time.Second
@@ -149,9 +149,6 @@ func (b *Backend) Stop() error {
 		b.api.Log.Error("Failed to stop poller", "id", b.config.ID, "error", err.Error())
 		return fmt.Errorf("failed to stop poller: %w", err)
 	}
-
-	// Stop the processor (cleanup deduplicator)
-	b.processor.Stop()
 
 	b.running = false
 	b.api.Log.Info("Dataminr backend stopped", "id", b.config.ID, "name", b.config.Name)

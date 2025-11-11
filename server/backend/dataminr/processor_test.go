@@ -18,7 +18,7 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 
 	t.Run("processes new alerts successfully", func(t *testing.T) {
 		api := plugintest.NewAPI(t)
-		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 		client := pluginapi.NewClient(api, &plugintest.Driver{})
 
 		postedAlerts := []backend.Alert{}
@@ -29,8 +29,8 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 			},
 		}
 
-		processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
-		defer processor.Stop()
+		mockDedup := NewMockDeduplicator()
+		processor := NewAlertProcessor(client, "dataminr", "Test Backend", mockPoster, "test-channel-id", mockDedup)
 
 		alerts := []Alert{
 			{
@@ -60,7 +60,7 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 
 	t.Run("skips duplicate alerts", func(t *testing.T) {
 		api := plugintest.NewAPI(t)
-		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
+		api.On("LogDebug", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe()
 		client := pluginapi.NewClient(api, &plugintest.Driver{})
 
 		postedAlerts := []backend.Alert{}
@@ -71,8 +71,8 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 			},
 		}
 
-		processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
-		defer processor.Stop()
+		mockDedup := NewMockDeduplicator()
+		processor := NewAlertProcessor(client, "dataminr", "Test Backend", mockPoster, "test-channel-id", mockDedup)
 
 		alerts := []Alert{
 			{
@@ -111,8 +111,8 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 			},
 		}
 
-		processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
-		defer processor.Stop()
+		mockDedup := NewMockDeduplicator()
+		processor := NewAlertProcessor(client, "dataminr", "Test Backend", mockPoster, "test-channel-id", mockDedup)
 
 		// First batch
 		batch1 := []Alert{
@@ -175,8 +175,8 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 			},
 		}
 
-		processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
-		defer processor.Stop()
+		mockDedup := NewMockDeduplicator()
+		processor := NewAlertProcessor(client, "dataminr", "Test Backend", mockPoster, "test-channel-id", mockDedup)
 
 		alerts := []Alert{
 			{
@@ -222,8 +222,8 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 			},
 		}
 
-		processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
-		defer processor.Stop()
+		mockDedup := NewMockDeduplicator()
+		processor := NewAlertProcessor(client, "dataminr", "Test Backend", mockPoster, "test-channel-id", mockDedup)
 
 		count, err := processor.ProcessAlerts([]Alert{})
 
@@ -239,8 +239,8 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 
 		mockPoster := &MockPoster{}
 
-		processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
-		defer processor.Stop()
+		mockDedup := NewMockDeduplicator()
+		processor := NewAlertProcessor(client, "dataminr", "Test Backend", mockPoster, "test-channel-id", mockDedup)
 
 		alerts := []Alert{
 			{
@@ -271,8 +271,8 @@ func TestAlertProcessor_ProcessAlerts(t *testing.T) {
 			},
 		}
 
-		processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
-		defer processor.Stop()
+		mockDedup := NewMockDeduplicator()
+		processor := NewAlertProcessor(client, "dataminr", "Test Backend", mockPoster, "test-channel-id", mockDedup)
 
 		alerts := []Alert{
 			{

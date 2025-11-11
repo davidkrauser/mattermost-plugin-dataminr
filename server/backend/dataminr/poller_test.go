@@ -156,8 +156,8 @@ func TestPoller_run_Success(t *testing.T) {
 			return nil
 		},
 	}
-	processor := NewAlertProcessor(client, "Test Backend", mockPoster, "test-channel-id")
-	defer processor.Stop()
+	mockDedup := NewMockDeduplicator()
+	processor := NewAlertProcessor(client, "dataminr", "Test Backend", mockPoster, "test-channel-id", mockDedup)
 
 	poller := NewPoller(
 		client,
@@ -201,8 +201,8 @@ func TestPoller_run_FetchError(t *testing.T) {
 		err: errors.New("API error"),
 	}
 
-	processor := NewAlertProcessor(client, "Test Backend", &MockPoster{}, "test-channel-id")
-	defer processor.Stop()
+	mockDedup := NewMockDeduplicator()
+	processor := NewAlertProcessor(client, "dataminr", "Test Backend", &MockPoster{}, "test-channel-id", mockDedup)
 
 	poller := NewPoller(
 		client,

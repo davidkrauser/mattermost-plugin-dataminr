@@ -70,7 +70,7 @@ Each backend instance is self-contained and manages:
 - **State Storage**: Per-backend KV store keys (auth token, cursor, error count)
 - **Alert Processor**: Orchestrates normalization, deduplication, and alert handling
   - Uses pure adapter functions for normalization
-  - Maintains in-memory deduplication cache with automatic cleanup
+  - Uses plugin-level deduplicator shared across all backends
   - Invokes alert handler callback for posting to Mattermost
 - **Error Tracking**: Tracks failures in state storage, implements retry logic at poll cycle intervals, isolates errors per backend
 
@@ -348,6 +348,7 @@ A central registry (implemented in `server/backend/registry.go`) manages all bac
 - **Disabled backends**: When a backend is registered but not enabled, `ClearOperationalState()` removes cursor and auth token from KV store while preserving failure tracking data (last poll, last success, consecutive failures, last error)
 - **Re-enabling backends**: When a disabled backend is re-enabled via configuration change, failure state is reset (consecutive failures = 0, last error = "") to ensure a fresh start
 - **Purpose**: Ensures disabled backends start fresh when re-enabled, avoiding issues with stale authentication tokens or outdated pagination cursors
+- **⚠️ IMPORTANT - Duplicate Alerts**: When a backend is disabled and re-enabled, the cursor is cleared. This means the next poll will fetch alerts from the beginning (or from whatever starting point the API provides). The plugin-level deduplicator will catch previously posted alerts, but **duplicates may occur if the deduplication cache entry has expired** (TTL is 24 hours). To minimize duplicates, avoid disabling and re-enabling backends unless necessary.
 
 **On Plugin Deactivation:**
 1. Stop all backends gracefully
@@ -360,28 +361,26 @@ A central registry (implemented in `server/backend/registry.go`) manages all bac
 ### 5.1 Package Structure
 
 ```
-server/backend/dataminr/
-├── dataminr.go       # Main backend implementation (dataminr.Backend type)
-├── auth.go           # Authentication manager
-├── client.go         # API client
-├── poller.go         # Polling job
-├── adapter.go        # Alert normalization (pure functions)
-├── deduplicator.go   # Deduplication cache
-├── processor.go      # Alert processing orchestrator
-├── state.go          # KV state storage
-├── scheduler.go      # Job scheduler interface
-└── types.go          # Dataminr-specific types
-```
-
-**Backend Core Files:**
-```
-server/backend/
-├── constants.go      # Application constants (MaxConsecutiveFailures, etc.)
-├── interface.go      # Backend interface definition
-├── backend.go        # Config and Status structs
-├── alert.go          # Normalized Alert and Location structs
-├── registry.go       # Thread-safe backend registry
-└── validator.go      # Configuration validation
+server/
+├── plugin.go         # Main plugin implementation
+├── deduplicator.go   # Shared deduplication cache (plugin-level, 24hr TTL)
+└── backend/
+    ├── constants.go      # Application constants (MaxConsecutiveFailures, etc.)
+    ├── interface.go      # Backend interface definition
+    ├── backend.go        # Config and Status structs
+    ├── alert.go          # Normalized Alert and Location structs
+    ├── registry.go       # Thread-safe backend registry
+    ├── validator.go      # Configuration validation
+    └── dataminr/
+        ├── dataminr.go   # Main backend implementation (dataminr.Backend type)
+        ├── auth.go       # Authentication manager
+        ├── client.go     # API client
+        ├── poller.go     # Polling job
+        ├── adapter.go    # Alert normalization (pure functions)
+        ├── processor.go  # Alert processing orchestrator
+        ├── state.go      # KV state storage
+        ├── scheduler.go  # Job scheduler interface
+        └── types.go      # Dataminr-specific types
 ```
 
 ### 5.2 Key Implementation Requirements
@@ -404,33 +403,45 @@ server/backend/
 **Poller (`poller.go`):**
 - **CRITICAL**: Must use Mattermost's cluster plugin scheduled job system (plugin API's `PluginAPI.Jobs.CreateJob()` and job callback registration)
 - This ensures only ONE server instance polls each backend in a multi-server cluster deployment
-- 30-second polling cycle for regular operation
-- **Catch-Up Mechanism**: When no cursor exists (first time setup):
-  - Runs background goroutine that polls every 5 seconds
-  - Skips posting alerts older than 24 hours
-  - Stops when first alert within 24 hours is found
-  - Saves cursor after each API call for crash recovery
-  - **Failure Tracking**: Updates `lastPoll` before each API call, tracks `lastSuccess`, resets failure counter and clears error message on successful fetch (same as regular polling)
-  - Disables backend on errors after `MaxConsecutiveFailures` (5) consecutive failures
-  - Then starts regular polling job
-  - Cancellable via context (Stop() cancels cleanly)
-- Regular polling: Load cursor from state → poll API → process alerts → save cursor
-- Graceful shutdown by canceling scheduled jobs and catch-up routine
+- Configured poll interval (default 30 seconds, minimum 10 seconds)
+- **Polling Behavior**:
+  - Load cursor from state (empty string if no cursor exists)
+  - Fetch alerts from API with cursor parameter
+  - Process ALL alerts returned (no filtering by age)
+  - Save new cursor from API response
+  - Update last poll time, last success time, reset failure counter on success
+  - **WARNING**: When no cursor exists (first poll or after disable/enable), API may return historical alerts that will be posted to the channel
+- **Failure Tracking**:
+  - Updates `lastPoll` before each API call
+  - Tracks `lastSuccess` on successful fetch
+  - Increments consecutive failure counter on error
+  - Saves error message to state on failure
+  - Disables backend after `MaxConsecutiveFailures` (5) consecutive failures
+- Graceful shutdown by canceling scheduled jobs
 - Each backend registers its own unique job with a backend-specific job ID
 
-**Alert Processing (`adapter.go`, `deduplicator.go`, `processor.go`):**
+**Alert Processing (`adapter.go`, `processor.go`):**
 - **Adapter** (`adapter.go`): Pure functions to normalize Dataminr alerts to backend.Alert
   - Extracts metadata (topics, alert lists, linked alerts, sub-headline, media)
   - Converts miles to meters for location confidence radius
   - Formats sub-headlines with markdown
-- **Deduplicator** (`deduplicator.go`): In-memory deduplication cache
-  - Tracks seen alert IDs with timestamps
-  - Cleanup runs every 10 minutes, removes entries older than 1 hour
-  - Thread-safe with RWMutex for concurrent access
 - **Processor** (`processor.go`): Orchestrates normalization, deduplication, and alert handling
+  - Receives plugin-level deduplicator shared across all backends
+  - Uses atomic `RecordAlert(backendType, alertID)` method for thread-safe deduplication
+  - Alert IDs are namespaced by backend type (e.g., "dataminr:12345") to prevent collisions
   - Processes alert batches from API client
   - Skips duplicates and continues on handler errors
   - Calls alert handler callback for each new alert
+
+**Deduplicator** (plugin-level, `server/deduplicator.go`):
+- **Shared across all backends**: Single deduplicator instance prevents duplicates globally
+- **In-memory cache**: Tracks seen alert IDs with timestamps (not persisted to KV store)
+- **24-hour TTL**: Entries older than 24 hours are automatically removed
+- **Cleanup**: Runs every 10 minutes to remove expired entries
+- **Thread-safe**: Uses RWMutex for concurrent access across multiple backends
+- **Namespaced IDs**: Alert IDs include backend type to prevent collisions (e.g., "dataminr:alert-123")
+- **Lifecycle**: Initialized on plugin activation, stopped on plugin deactivation
+- **Atomic operations**: `RecordAlert()` atomically checks and records alerts to prevent race conditions
 
 **State Storage (`state.go`):**
 - **KV store keys** (defined as constants):
@@ -522,6 +533,25 @@ When a backend experiences errors:
   - Update backend status in KV store to reflect disabled state
   - Backend will not resume until admin re-enables it via configuration
 - Administrators should monitor server logs for backend health
+
+### 7.4 Duplicate Alert Scenarios
+
+The plugin uses cursor-based pagination and a **plugin-level shared deduplicator** (24-hour TTL) to prevent duplicate alerts across all backends.
+
+**When Duplicates MAY Occur:**
+1. **Backend disable/enable after >24 hours**: If a backend is disabled for more than 24 hours, deduplication cache entries expire. When re-enabled with a cleared cursor, the API returns old alerts that are no longer in the cache.
+2. **Plugin deactivation/activation or server reboot**: Dedup cache is cleared (in-memory only). However, cursor is preserved in KV store, so duplicates should be rare unless the API returns overlapping results.
+
+**When Duplicates SHOULD NOT Occur:**
+1. **Normal polling**: Cursor-based pagination prevents re-fetching old alerts
+2. **Authentication refresh**: Cursor and dedup cache remain intact
+3. **Transient errors**: Cursor is only updated after successful processing
+4. **Backend disable/enable within 24 hours**: Deduplicator retains alert IDs, preventing duplicates even when cursor is cleared
+5. **Backend configuration changes**: Deduplicator is shared across all backend instances
+6. **Multiple backends with same alert**: Namespaced alert IDs prevent cross-backend collisions
+
+**Key Improvement:**
+The plugin-level deduplicator significantly reduces duplicate scenarios compared to per-backend deduplication. Duplicates are now limited to cases where the deduplication cache has been cleared (server restart) or expired (24-hour TTL).
 
 ---
 

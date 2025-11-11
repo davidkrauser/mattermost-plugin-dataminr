@@ -33,12 +33,16 @@ type Plugin struct {
 
 	// poster posts alerts to Mattermost channels.
 	poster backend.AlertPoster
+
+	// deduplicator is shared across all backends to prevent duplicate alerts
+	deduplicator *Deduplicator
 }
 
 // OnActivate is invoked when the plugin is activated. If an error is returned, the plugin will be deactivated.
 func (p *Plugin) OnActivate() error {
 	p.client = pluginapi.NewClient(p.API, p.Driver)
 	p.registry = backend.NewRegistry()
+	p.deduplicator = NewDeduplicator(p.client)
 
 	// Check license
 	if !pluginapi.IsEnterpriseLicensedOrDevelopment(p.API.GetConfig(), p.API.GetLicense()) {
@@ -90,6 +94,11 @@ func (p *Plugin) OnDeactivate() error {
 			return err
 		}
 	}
+
+	if p.deduplicator != nil {
+		p.deduplicator.Stop()
+	}
+
 	return nil
 }
 
@@ -97,8 +106,8 @@ func (p *Plugin) OnDeactivate() error {
 // If the backend is enabled, it also starts the backend.
 // Logs errors but does not fail - errors are non-fatal for individual backends.
 func (p *Plugin) createAndStartBackend(config backend.Config) {
-	// Create backend instance using factory, passing the disable callback
-	b, err := backend.Create(config, p.client, p.API, p.poster, p.disableBackend)
+	// Create backend instance using factory, passing the shared deduplicator and disable callback
+	b, err := backend.Create(config, p.client, p.API, p.poster, p.deduplicator, p.disableBackend)
 	if err != nil {
 		p.API.LogError("Failed to create backend", "id", config.ID, "name", config.Name, "error", err.Error())
 		return

@@ -17,8 +17,28 @@ func (m *mockPoster) PostAlert(alert Alert, channelID string) error {
 	return nil
 }
 
+// mockDeduplicator is a simple deduplicator implementation for testing
+type mockDeduplicator struct {
+	seen map[string]bool
+}
+
+func newMockDeduplicator() *mockDeduplicator {
+	return &mockDeduplicator{
+		seen: make(map[string]bool),
+	}
+}
+
+func (m *mockDeduplicator) RecordAlert(backendType, alertID string) bool {
+	key := backendType + ":" + alertID
+	if _, exists := m.seen[key]; exists {
+		return false
+	}
+	m.seen[key] = true
+	return true
+}
+
 // mockFactory creates a mock backend using the existing mockBackend from registry_test.go
-func mockFactory(config Config, api *pluginapi.Client, papi plugin.API, poster AlertPoster, disableCallback DisableCallback) (Backend, error) {
+func mockFactory(config Config, api *pluginapi.Client, papi plugin.API, poster AlertPoster, deduplicator Deduplicator, disableCallback DisableCallback) (Backend, error) {
 	return newMockBackend(config.ID, config.Name, config.Type), nil
 }
 
@@ -78,7 +98,7 @@ func TestCreate(t *testing.T) {
 			Type: "mock",
 		}
 
-		backend, err := Create(config, client, api, &mockPoster{}, nil)
+		backend, err := Create(config, client, api, &mockPoster{}, newMockDeduplicator(), nil)
 		require.NoError(t, err)
 		require.NotNil(t, backend)
 
@@ -96,7 +116,7 @@ func TestCreate(t *testing.T) {
 			Type: "unknown",
 		}
 
-		backend, err := Create(config, client, api, &mockPoster{}, nil)
+		backend, err := Create(config, client, api, &mockPoster{}, newMockDeduplicator(), nil)
 		assert.Error(t, err)
 		assert.Nil(t, backend)
 		assert.Contains(t, err.Error(), "unknown backend type: unknown")
@@ -111,7 +131,7 @@ func TestCreate(t *testing.T) {
 			Type: "",
 		}
 
-		backend, err := Create(config, client, api, &mockPoster{}, nil)
+		backend, err := Create(config, client, api, &mockPoster{}, newMockDeduplicator(), nil)
 		assert.Error(t, err)
 		assert.Nil(t, backend)
 		assert.Contains(t, err.Error(), "backend type is required")

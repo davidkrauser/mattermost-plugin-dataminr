@@ -9,20 +9,22 @@ import (
 // AlertProcessor orchestrates alert normalization and deduplication
 type AlertProcessor struct {
 	api          *pluginapi.Client
+	backendType  string
 	backendName  string
 	poster       backend.AlertPoster
 	channelID    string
-	deduplicator *Deduplicator
+	deduplicator backend.Deduplicator
 }
 
 // NewAlertProcessor creates a new alert processor
-func NewAlertProcessor(api *pluginapi.Client, backendName string, poster backend.AlertPoster, channelID string) *AlertProcessor {
+func NewAlertProcessor(api *pluginapi.Client, backendType, backendName string, poster backend.AlertPoster, channelID string, deduplicator backend.Deduplicator) *AlertProcessor {
 	return &AlertProcessor{
 		api:          api,
+		backendType:  backendType,
 		backendName:  backendName,
 		poster:       poster,
 		channelID:    channelID,
-		deduplicator: NewDeduplicator(api),
+		deduplicator: deduplicator,
 	}
 }
 
@@ -32,14 +34,12 @@ func (p *AlertProcessor) ProcessAlerts(alerts []Alert) (int, error) {
 	newCount := 0
 
 	for _, alert := range alerts {
-		// Check for duplicates
-		if p.deduplicator.IsDuplicate(alert.AlertID) {
-			p.api.Log.Debug("Skipping duplicate alert", "alertId", alert.AlertID)
+		// Atomically check and record alert (prevents race conditions)
+		isNew := p.deduplicator.RecordAlert(p.backendType, alert.AlertID)
+		if !isNew {
+			p.api.Log.Debug("Skipping duplicate alert", "backendType", p.backendType, "alertId", alert.AlertID)
 			continue
 		}
-
-		// Mark as seen
-		p.deduplicator.MarkSeen(alert.AlertID)
 
 		// Normalize to backend.Alert
 		normalized := NormalizeAlert(alert, p.backendName)
@@ -55,9 +55,4 @@ func (p *AlertProcessor) ProcessAlerts(alerts []Alert) (int, error) {
 	}
 
 	return newCount, nil
-}
-
-// Stop stops the processor and cleanup goroutines
-func (p *AlertProcessor) Stop() {
-	p.deduplicator.Stop()
 }

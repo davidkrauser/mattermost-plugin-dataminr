@@ -6,6 +6,7 @@ import (
 
 	"github.com/mattermost/mattermost-plugin-dataminr/server/backend"
 	"github.com/mattermost/mattermost-plugin-dataminr/server/formatter"
+	"github.com/mattermost/mattermost-plugin-dataminr/server/hashtag"
 )
 
 // Poster posts alerts to Mattermost channels.
@@ -34,11 +35,15 @@ func (p *Poster) PostAlert(alert backend.Alert, channelID string) error {
 	// Format alert attachment with all fields
 	attachment := formatter.FormatAlert(alert)
 
+	// Generate hashtags for searchability
+	hashtagText := hashtag.Generate(alert)
+
 	// Create post with attachment
 	post := &model.Post{
 		UserId:    p.botID,
 		ChannelId: channelID,
 		Type:      model.PostTypeSlackAttachment,
+		Message:   hashtagText, // Add hashtags as the main message text
 		Props:     model.StringInterface{},
 	}
 

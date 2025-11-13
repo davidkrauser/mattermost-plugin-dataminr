@@ -1,563 +1,150 @@
-# Mattermost Dataminr Plugin - Technical Specification
+# Mattermost Dataminr Plugin
 
-**Version:** 0.9.2
-**Date:** 2025-11-05
+**Version:** 0.9.3
+**Date:** 2025-11-13
 **Status:** Active Development
 
 ---
 
-## Table of Contents
+## Overview
 
-1. [Project Overview](#1-project-overview)
-2. [Architecture](#2-architecture)
-3. [Configuration System](#3-configuration-system)
-4. [Backend System](#4-backend-system)
-5. [Dataminr Backend Implementation](#5-dataminr-backend-implementation)
-6. [Alert Formatting](#6-alert-formatting)
-7. [Error Handling](#7-error-handling)
-8. [Implementation Notes](#8-implementation-notes)
+Real-time alerting system that integrates Dataminr First Alert API with Mattermost. Polls configured backends for new events and posts them to designated channels.
 
----
+### Key Design Principles
 
-## 1. Project Overview
-
-### 1.1 Purpose
-
-The Mattermost Dataminr Plugin is a real-time alerting system that integrates Dataminr First Alert API with Mattermost. It continuously polls configured Dataminr backends for new events and posts them to designated Mattermost channels, enabling teams to receive critical alerts directly in their communication platform. The plugin architecture is designed to be extensible for future backend integrations.
-
-### 1.2 Initial Scope
-
-**Version 1.0 Features:**
-- Support for multiple Dataminr backend configurations
-- Dataminr First Alert API integration
-- System Console configuration interface
-- Per-backend authentication and polling
-- Rich alert formatting in Mattermost with color coding and embedded media
-- Individual backend error handling and isolation
-- 30-second polling interval per backend
-
-### 1.3 Key Design Principles
-
-1. **Isolation**: Each Dataminr backend operates independently with its own authentication, polling state, and error handling
-2. **Resilience**: Backend failures don't affect other backends or the plugin stability
-3. **Extensibility**: Architecture designed to support future backend types beyond Dataminr
-4. **Rich UX**: Alerts are formatted with color coding, embedded media, and structured data matching Dataminr's alert types
-5. **Administrative Control**: All configuration via System Console with validation
+1. **Isolation**: Each backend operates independently with its own authentication, polling state, and error handling
+2. **Resilience**: Backend failures don't affect other backends or plugin stability
+3. **Extensibility**: Architecture supports future backend types beyond Dataminr
+4. **Cluster-Aware**: Uses Mattermost's cluster scheduled job system to ensure only one server polls in multi-server deployments
+5. **Deduplication**: Plugin-level deduplicator (24hr TTL) shared across all backends prevents duplicate alerts globally
 
 ---
 
-## 2. Architecture
+## Architecture
 
-### 2.1 Component Descriptions
+### Core Components
 
-#### Configuration Manager
-- Parses the `backends` JSON configuration from plugin settings
-- Validates backend configurations (URLs, credentials, channel IDs)
-- Triggers backend creation/destruction on configuration changes
-- Provides configuration validation feedback to admins
+- **Backend Registry**: Thread-safe registry managing all backend instances
+- **Backend Instance**: Self-contained unit with authentication, API client, cluster-aware poller, state storage, and alert processor
+- **Alert Processor**: Normalizes alerts, uses shared deduplicator, posts to Mattermost
+- **Deduplicator**: In-memory cache (24hr TTL) shared across all backends with namespaced alert IDs
+- **Admin Console**: React component for backend configuration with real-time status display
 
-#### Backend Manager
-- Maintains a registry of active backend instances
-- Creates backend instances from configuration
-- Starts/stops polling jobs for each backend
-- Provides health status for all backends
+### Backend Configuration
 
-#### Backend Instance
-Each backend instance is self-contained and manages:
-- **Authentication Manager**: Handles token lifecycle (obtain, refresh, validate)
-- **API Client**: HTTP client for backend-specific API calls
-- **Poller**: Cluster-aware scheduled job that runs every 30 seconds (uses Mattermost's cluster plugin scheduled job system to ensure only one instance polls in multi-server deployments)
-- **State Storage**: Per-backend KV store keys (auth token, cursor, error count)
-- **Alert Processor**: Orchestrates normalization, deduplication, and alert handling
-  - Uses pure adapter functions for normalization
-  - Uses plugin-level deduplicator shared across all backends
-  - Invokes alert handler callback for posting to Mattermost
-- **Error Tracking**: Tracks failures in state storage, implements retry logic at poll cycle intervals, isolates errors per backend
+Backends are configured via `plugin.json` settings as a JSON array. Each backend requires:
+- `id`: UUID v4 (immutable, auto-generated, used for KV store keys and job IDs)
+- `name`: Display name (mutable, must be unique)
+- `type`: "dataminr" (extensible)
+- `enabled`: Boolean
+- `url`, `apiId`, `apiKey`: Backend credentials
+- `channelId`: Mattermost channel to post alerts
+- `pollIntervalSeconds`: Poll interval (min: 10, default: 30)
 
-#### Alert Formatter
-- Backend-agnostic formatting layer
-- Converts normalized alerts to Mattermost message attachments
-- Applies rich formatting (colors, embedded images, fields)
-- Supports backend-specific customization
+**Important**: Backend `id` is immutable and used for all internal operations (KV keys, job IDs). Backend `name` can change without affecting state storage.
 
-#### Mattermost Poster
-- Posts formatted alerts to configured channels
-- Handles posting errors (channel not found, permissions)
-- Validates bot access to channels
+### Error Handling & Auto-Disable
 
----
+- Backends track consecutive failures in KV store
+- After 5 consecutive failures (`MaxConsecutiveFailures`), backend is automatically disabled
+- Admin console displays status: ✅ Active, ⚠️ Warning (1-4 failures), ❌ Error (auto-disabled), ⚪ Disabled (manual)
+- Re-enabling a backend resets failure state and clears operational state (cursor + auth token)
 
-## 3. Configuration System
+### Duplicate Alert Prevention
 
-### 3.1 Plugin Settings Schema
-
-The plugin configuration in `plugin.json` will have the following settings:
-
-```json
-{
-  "settings_schema": {
-    "header": "Configure backends to monitor for alerts. Each backend polls for events and posts them to a designated Mattermost channel.",
-    "settings": [
-      {
-        "key": "Backends",
-        "display_name": "Backend Configurations",
-        "type": "custom",
-        "help_text": "Configure alert backends to monitor. Each backend independently polls its API and posts alerts to a designated channel."
-      }
-    ]
-  }
-}
-```
-
-**Note:** Plugin enable/disable is handled by Mattermost's standard plugin management interface and does not require a custom setting.
-
-**Custom Webapp Component for Backends:**
-
-The `Backends` custom type requires a React component in the webapp that provides:
-
-- **Backend List View**: Display all configured backends with status indicators
-- **Add/Edit Backend Form**: Fields for name, type, URL, credentials, channel, poll interval
-- **Status Display**: Show backend health with visual indicators:
-  - ✅ Active and polling successfully (consecutiveFailures = 0)
-  - ⚠️ Warning (1-4 consecutive failures, still enabled)
-  - ❌ Disabled (consecutiveFailures >= MaxConsecutiveFailures)
-  - ❓ Unknown (no status data available yet)
-  - Error message display for failed backends (from lastError field)
-  - Last poll time and last success time
-- **Per-Backend Configuration Fields**:
-  - Name (unique identifier, text input)
-  - Type (dropdown: "dataminr", extensible for future types)
-  - Enabled toggle (per-backend enable/disable)
-  - API URL (text input with HTTPS validation)
-  - API credentials (apiId and apiKey text inputs, displayed as password fields)
-  - Target Mattermost channel (autocomplete selector using react-select/async)
-    - Searches all channels (public and private) across all teams
-    - Displays channel name with team name in parentheses
-    - Shows channel icon (🌐 for public, 🔒 for private)
-    - Implemented in `ChannelSelector.tsx`
-    - Uses Mattermost Client4 API for channel search and retrieval
-  - Poll interval in seconds (number input, min: 10, default: 30)
-- **Actions**: Add, edit, delete, enable/disable toggle
-- **Real-time Status**: Periodically fetch backend status from `/api/v1/backends/status` endpoint (every 30 seconds) and merge with configuration data for display
-- **Configuration Persistence**: Uses Mattermost's standard `updateConfig()` Redux action to save backend array to plugin settings
-
-**Component Location:**
-- `webapp/src/components/admin_console/backend_settings.tsx`
-- Register in `webapp/src/index.tsx` via `registerAdminConsoleCustomSetting()`
-
-**Status Merging Logic:**
-- The component displays all backends from the configuration (received via props from plugin settings)
-- A separate API call polls the `/api/v1/backends/status` endpoint every 30 seconds
-- Status data is merged with configuration data by matching backend IDs
-- This fills in the status indicators (✅ ⚠️ ❌ ❓), error messages (from lastError), and timestamps
-- Backends in configuration without status data show as ❓ Unknown state
-- When a backend is disabled due to failures, administrators can re-enable it by toggling the "enabled" field and saving the configuration, which will trigger `OnConfigurationChange` and restart the backend with cleared error state
-
-### 3.2 Backend Configuration Schema
-
-The `Backends` field contains a JSON array of backend objects. Each backend has:
-
-```json
-{
-  "id": "string",                  // Unique stable identifier (UUID v4, auto-generated, immutable)
-  "name": "string",                // Display name (e.g., "Production Alerts", user can change)
-  "type": "string",                // Backend type: "dataminr" (extensible to others)
-  "enabled": "boolean",            // Whether this backend is active (default: true)
-  "url": "string",                 // Base API URL
-  "apiId": "string",               // API user ID (backend-specific)
-  "apiKey": "string",              // API key/password (backend-specific)
-  "channelId": "string",           // Mattermost channel ID to post alerts
-  "pollIntervalSeconds": "number"  // How often to poll this backend (min: 10, recommended: 30)
-}
-```
-
-**Backend Identification:**
-- Each backend is assigned a **unique ID** (UUID v4) when created by the admin console component
-- The `id` field is **immutable** and **must be unique** across all backends
-- The `id` field is used for all internal operations:
-  - KV store keys (e.g., `backend_{id}_cursor`, `backend_{id}_auth`)
-  - Cluster scheduled job IDs
-  - Backend registry lookups
-- The `name` field is **mutable** but **must also be unique** across all backends to avoid admin confusion
-- When a backend name changes, no KV store migration is needed (keys remain stable using the immutable `id`)
-- The webapp component must:
-  - Generate a UUID v4 when creating a new backend
-  - Validate that the name is unique before saving
-  - Preserve the `id` field when editing a backend configuration
-- Configuration validation must ensure:
-  - No duplicate `id` values exist
-  - No duplicate `name` values exist
-
-**Example Configuration:**
-
-```json
-[
-  {
-    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "name": "Production Dataminr",
-    "type": "dataminr",
-    "enabled": true,
-    "url": "https://firstalert-api.dataminr.com",
-    "apiId": "your_api_id",
-    "apiKey": "your_api_key",
-    "channelId": "your_channel_id",
-    "pollIntervalSeconds": 30
-  }
-]
-```
-
-### 3.3 Configuration Validation
-
-On configuration change (`OnConfigurationChange` hook), validate:
-
-1. **JSON Parsing**: Backends field is valid JSON array
-2. **Required Fields**: Each backend has id, name, type, url, apiId, apiKey, channelId, pollIntervalSeconds
-3. **UUID Format**: Each backend `id` is a valid UUID v4
-4. **Duplicate IDs**: No two backends have the same `id`
-5. **Duplicate Names**: No two backends have the same `name`
-6. **Type Support**: Backend type is "dataminr" (reject unknown types)
-7. **URL Format**: URLs are valid and use HTTPS
-8. **Poll Interval Minimum**: pollIntervalSeconds is at least 10
-9. **Channel Access**: Plugin bot has permission to post in specified channels
-
-**Validation Errors**: If validation fails, log detailed error and return error from `OnConfigurationChange`. Plugin will continue with previous valid configuration.
+**Plugin-level deduplicator** (24hr TTL) prevents duplicates across all backends:
+- Namespaced IDs (e.g., "dataminr:12345") prevent cross-backend collisions
+- Duplicates MAY occur if:
+  - Backend disabled >24 hours (cache expired) then re-enabled
+  - Plugin deactivated/server reboot (cache cleared, but cursor preserved)
 
 ---
 
-## 4. Backend System
+## Critical Implementation Details
 
-### 4.1 Constants
+### ⚠️ Deadlock Prevention
 
-The following constants are defined at the application level:
+1. **Configuration Lock**: NEVER hold `configurationLock` while calling `SavePluginConfig()` (triggers `OnConfigurationChange` which tries to acquire same lock)
+   - Use `getConfiguration()` to clone config, modify clone, call `SavePluginConfig()` without holding locks
 
-```go
-const (
-	// MaxConsecutiveFailures is the number of consecutive polling failures
-	// before a backend is automatically disabled. This prevents runaway
-	// error conditions and excessive API calls to failing backends.
-	MaxConsecutiveFailures = 5
+2. **Auto-Disable Callback**: MUST invoke `disableCallback` in a goroutine in poller.go
+   - Without goroutine: poller calls callback → triggers `OnConfigurationChange` → tries to stop poller → poller waiting for callback = deadlock
+   - With goroutine: poll cycle completes, then config change cleanly stops and re-registers backend
 
-	// MinPollIntervalSeconds is the minimum allowed poll interval
-	MinPollIntervalSeconds = 10
+3. **Polling Wait Interval**: Cluster job scheduler's `nextWaitInterval()` must calculate elapsed time since last execution
+   - Returning fixed interval causes job to never execute
+   - Pattern: calculate elapsed time, return remaining wait if interval hasn't passed, return 0 if ready
 
-	// DefaultPollIntervalSeconds is the recommended default
-	DefaultPollIntervalSeconds = 30
+### Dataminr API Specifics
 
-	// AuthTokenRefreshBuffer is how long before token expiry to refresh
-	AuthTokenRefreshBuffer = 5 * time.Minute
-)
+**Authentication** (CRITICAL - must use form-urlencoded):
 ```
+POST /auth/1/userAuthorization
+Content-Type: application/x-www-form-urlencoded
 
-When a backend reaches `MaxConsecutiveFailures`, it is automatically disabled and its status is updated in the KV store. The custom webapp component will display this failure state with the error message to administrators.
-
-### 4.2 REST API Endpoints
-
-The plugin exposes a single REST API endpoint for backend status:
-
-**GET /plugins/com.mattermost.dataminr/api/v1/backends/status**
-- Returns status for all configured backends
-- Response: Map of backend IDs (UUIDs) to status objects containing:
-  - `enabled`: boolean (whether backend is active)
-  - `lastPollTime`: timestamp of last poll attempt
-  - `lastSuccessTime`: timestamp of last successful poll
-  - `consecutiveFailures`: number of consecutive failures
-  - `isAuthenticated`: boolean (auth token validity)
-  - `lastError`: string (error message from most recent failure, empty if no error)
-- Map keys are backend IDs, not names (to maintain stability when names change)
-- Used by admin console component to display real-time backend health
-- Requires system admin permissions
-
-**Example Response:**
-```json
-{
-  "550e8400-e29b-41d4-a716-446655440000": {
-    "enabled": true,
-    "lastPollTime": "2025-10-29T14:30:00Z",
-    "lastSuccessTime": "2025-10-29T14:30:00Z",
-    "consecutiveFailures": 0,
-    "isAuthenticated": true,
-    "lastError": ""
-  },
-  "6ba7b810-9dad-11d1-80b4-00c04fd430c8": {
-    "enabled": false,
-    "lastPollTime": "2025-10-29T14:25:00Z",
-    "lastSuccessTime": "2025-10-29T14:00:00Z",
-    "consecutiveFailures": 5,
-    "isAuthenticated": false,
-    "lastError": "authentication failed: invalid credentials"
-  }
-}
+grant_type=api_key&scope=first_alert_api&api_user_id=X&api_password=Y
 ```
-
-**Note:** Backend configuration (create, update, delete) is handled through Mattermost's standard plugin configuration API. The custom webapp component uses the standard `updateConfig` action to save backend configurations.
-
-### 4.3 Backend Interface
-
-All backend types must implement a common interface. Key responsibilities:
-
-- Initialize with configuration
-- Start/stop polling lifecycle
-- Provide unique identifier, name, and type
-- Return current health status
-
-The interface works with three main structures:
-- **Config**: ID, Name, Type, Enabled, URL, credentials, ChannelID, PollIntervalSeconds
-- **Status**: Enabled, poll times, failure count, authentication state, last error
-- **Alert**: Normalized alert data with backend name, alert metadata (topics, lists, linked alerts), location, source text, translated text, and media URLs
-
-### 4.4 Backend Registry
-
-A central registry (implemented in `server/backend/registry.go`) manages all backend instances:
-
-**Responsibilities:**
-- Maintains a map of backend ID (UUID) to Backend instance
-- Thread-safe operations with mutex protection
-- Registers new backends and prevents duplicate IDs
-- Unregisters backends (stops backend before removal)
-- Retrieves backends by ID
-- Lists all registered backends
-- Stops all backends on shutdown
-
-### 4.5 Backend Lifecycle
-
-**On Plugin Activation:**
-1. Parse `Backends` configuration
-2. For each backend config:
-   - Create backend instance (factory pattern based on type)
-   - Initialize with config
-   - Register in registry
-   - If backend is enabled: start polling
-   - If backend is disabled: clear operational state (cursor + auth token)
-
-**On Configuration Change:**
-1. Parse new `Backends` configuration
-2. Compare with current backends
-3. For removed backends:
-   - Stop and unregister
-4. For new backends:
-   - Create, initialize, register
-   - If enabled: start polling
-   - If disabled: clear operational state
-5. For modified backends:
-   - Stop old instance
-   - Create new instance
-   - If enabled: start polling, resetting failure state
-   - If disabled: clear operational state
-
-**Operational State Management:**
-- **Disabled backends**: When a backend is registered but not enabled, `ClearOperationalState()` removes cursor and auth token from KV store while preserving failure tracking data (last poll, last success, consecutive failures, last error)
-- **Re-enabling backends**: When a disabled backend is re-enabled via configuration change, failure state is reset (consecutive failures = 0, last error = "") to ensure a fresh start
-- **Purpose**: Ensures disabled backends start fresh when re-enabled, avoiding issues with stale authentication tokens or outdated pagination cursors
-- **⚠️ IMPORTANT - Duplicate Alerts**: When a backend is disabled and re-enabled, the cursor is cleared. This means the next poll will fetch alerts from the beginning (or from whatever starting point the API provides). The plugin-level deduplicator will catch previously posted alerts, but **duplicates may occur if the deduplication cache entry has expired** (TTL is 24 hours). To minimize duplicates, avoid disabling and re-enabling backends unless necessary.
-
-**On Plugin Deactivation:**
-1. Stop all backends gracefully
-2. Clear registry
-
----
-
-## 5. Dataminr Backend Implementation
-
-### 5.1 Package Structure
-
-```
-server/
-├── plugin.go         # Main plugin implementation
-├── deduplicator.go   # Shared deduplication cache (plugin-level, 24hr TTL)
-└── backend/
-    ├── constants.go      # Application constants (MaxConsecutiveFailures, etc.)
-    ├── interface.go      # Backend interface definition
-    ├── backend.go        # Config and Status structs
-    ├── alert.go          # Normalized Alert and Location structs
-    ├── registry.go       # Thread-safe backend registry
-    ├── validator.go      # Configuration validation
-    └── dataminr/
-        ├── dataminr.go   # Main backend implementation (dataminr.Backend type)
-        ├── auth.go       # Authentication manager
-        ├── client.go     # API client
-        ├── poller.go     # Polling job
-        ├── adapter.go    # Alert normalization (pure functions)
-        ├── processor.go  # Alert processing orchestrator
-        ├── state.go      # KV state storage
-        ├── scheduler.go  # Job scheduler interface
-        └── types.go      # Dataminr-specific types
-```
-
-### 5.2 Key Implementation Requirements
-
-**Authentication (`auth.go`):**
-- **CRITICAL**: Must use `application/x-www-form-urlencoded`, NOT JSON
-- Endpoint: `POST /auth/1/userAuthorization`
-- Parameters: `grant_type=api_key&scope=first_alert_api&api_user_id=X&api_password=Y`
-- Token lifetime: 1 hour
+- Token lifetime: 1 hour (refresh 5 min before expiry)
 - Authorization header: `Dmauth {token}` (NOT "Bearer")
-- Proactively refresh 5 minutes before expiry
 
-**API Client (`client.go`):**
-- Endpoint: `GET /alerts/1/alerts?alertversion=19&from={cursor}`
-- Alert version is hardcoded to 19 (changing this requires updating parsing logic)
-- Use `Dmauth` authorization header
-- Handle errors: 401 (re-auth), 429 (rate limit), 500 (retry)
-- Parse response with cursor for pagination
+**Polling:**
+```
+GET /alerts/1/alerts?alertversion=19&from={cursor}
+Authorization: Dmauth {token}
+```
+- Alert version hardcoded to 19 (changing requires updating parsing logic)
+- Cursor-based pagination required
+- Rate limit: 180 requests / 10 minutes
 
-**Poller (`poller.go`):**
-- **CRITICAL**: Must use Mattermost's cluster plugin scheduled job system (plugin API's `PluginAPI.Jobs.CreateJob()` and job callback registration)
-- This ensures only ONE server instance polls each backend in a multi-server cluster deployment
-- Configured poll interval (default 30 seconds, minimum 10 seconds)
-- **Polling Behavior**:
-  - Load cursor from state (empty string if no cursor exists)
-  - Fetch alerts from API with cursor parameter
-  - Process ALL alerts returned (no filtering by age)
-  - Save new cursor from API response
-  - Update last poll time, last success time, reset failure counter on success
-  - **WARNING**: When no cursor exists (first poll or after disable/enable), API may return historical alerts that will be posted to the channel
-- **Failure Tracking**:
-  - Updates `lastPoll` before each API call
-  - Tracks `lastSuccess` on successful fetch
-  - Increments consecutive failure counter on error
-  - Saves error message to state on failure
-  - Disables backend after `MaxConsecutiveFailures` (5) consecutive failures
-- Graceful shutdown by canceling scheduled jobs
-- Each backend registers its own unique job with a backend-specific job ID
-
-**Alert Processing (`adapter.go`, `processor.go`):**
-- **Adapter** (`adapter.go`): Pure functions to normalize Dataminr alerts to backend.Alert
-  - Extracts metadata (topics, alert lists, linked alerts, sub-headline, media)
-  - Converts miles to meters for location confidence radius
-  - Formats sub-headlines with markdown
-- **Processor** (`processor.go`): Orchestrates normalization, deduplication, and alert handling
-  - Receives plugin-level deduplicator shared across all backends
-  - Uses atomic `RecordAlert(backendType, alertID)` method for thread-safe deduplication
-  - Alert IDs are namespaced by backend type (e.g., "dataminr:12345") to prevent collisions
-  - Processes alert batches from API client
-  - Skips duplicates and continues on handler errors
-  - Calls alert handler callback for each new alert
-
-**Deduplicator** (plugin-level, `server/deduplicator.go`):
-- **Shared across all backends**: Single deduplicator instance prevents duplicates globally
-- **In-memory cache**: Tracks seen alert IDs with timestamps (not persisted to KV store)
-- **24-hour TTL**: Entries older than 24 hours are automatically removed
-- **Cleanup**: Runs every 10 minutes to remove expired entries
-- **Thread-safe**: Uses RWMutex for concurrent access across multiple backends
-- **Namespaced IDs**: Alert IDs include backend type to prevent collisions (e.g., "dataminr:alert-123")
-- **Lifecycle**: Initialized on plugin activation, stopped on plugin deactivation
-- **Atomic operations**: `RecordAlert()` atomically checks and records alerts to prevent race conditions
-
-**State Storage (`state.go`):**
-- **KV store keys** (defined as constants):
-  - `backend_{id}_cursor` - Pagination cursor
-  - `backend_{id}_auth` - Authentication token and expiry
-  - `backend_{id}_last_poll` - Last poll attempt timestamp
-  - `backend_{id}_last_success` - Last successful poll timestamp
-  - `backend_{id}_failures` - Consecutive failure counter
-  - `backend_{id}_last_error` - Most recent error message
-  - Uses backend UUID `id` field for stable key naming
-  - Keys remain unchanged when backend `name` is updated
-- **State Management**:
-  - `ClearOperationalState()` - Removes cursor and auth token only (preserves failure tracking)
-  - `ClearAll()` - Removes all state keys for backend removal
-  - Cursor tracking for pagination
-  - Auth token persistence with expiry
-  - Error count and message tracking
-
----
-
-## 6. Alert Formatting
-
-### 6.1 Formatting Requirements
-
-**Color Coding by Alert Type:**
-- **Flash**: Red (#D24B4E) - Breaking news, highest priority
-- **Urgent**: Orange (#EC8832) - High priority
-- **Alert**: Yellow (#FFBC1F) - Normal priority
+**Alert Types & Colors:**
+- Flash: Red (#D24B4E) - Breaking news
+- Urgent: Orange (#EC8832) - High priority
+- Alert: Yellow (#FFBC1F) - Normal
 - Unknown: Light Gray (#D3D3D3)
 
-**Single-Post Structure:**
+### Operational State Management
 
-Alerts are posted as a single message containing all alert information:
+When backend is disabled (auto or manual), `ClearOperationalState()`:
+- Removes cursor and auth token (ensures fresh start when re-enabled)
+- Preserves failure tracking data (last poll, last success, consecutive failures, last error)
 
-**Alert Post:**
-- Text: Alert headline as markdown H3 header
-- Color: Alert type color (Red/Orange/Yellow/Gray)
-- Fields (displayed in order):
-  - Alert Type (short field, side by side with Alert Link): Colored circle emoji + ALL CAPS alert type string (e.g., "🔴 FLASH", "🟠 URGENT", "🟡 ALERT", "⚪ UNKNOWN")
-  - Alert Link (short field, side by side with Alert Type): Link to view full alert on Dataminr platform (if AlertURL is available)
-  - Event Time (short field, side by side with Location)
-  - Location (address, coordinates, confidence radius) (short field, side by side with Event Time)
-  - Additional Context (sub-headline if available) (full width)
-  - Original Source Text (truncate at 500 chars) (full width)
-  - Translated Text (truncate at 500 chars) (full width)
-  - Topics (bulleted list, full width)
-  - Alert Lists (bulleted list, full width)
-  - Additional Media (links to media 2-4) (full width)
-  - Public Source link (last field) (full width)
-- ImageURL: First media item embedded
-- Footer: Backend name
-
-**Implementation Notes:**
-- Single post created with all fields included
-- Uses SlackAttachment format for rich formatting
-- If post fails, error is returned to caller
+When backend is removed from config, `ClearAll()` removes all KV keys.
 
 ---
 
-## 7. Error Handling
+## Development Guidelines
 
-### 7.1 Error Isolation
+### Testing
 
-- Each backend manages errors independently via state storage
-- Track consecutive failures, last error, and error time in KV store
-- Reset counter on successful poll
-- Disable backend when failures reach `MaxConsecutiveFailures` (5) threshold
+- **Unit Tests**: `testify` for assertions, `plugintest` for mocking Plugin API
+- **HTTP Mocking**: `httptest` for mocking external APIs
+- **Integration Tests**: Multiple components, `*_integration_test.go` files
+- **Linting**: CRITICAL - Always run `make check-style` before committing
+  - Use `npm run fix` in webapp directory for auto-fixes
+  - Fix TypeScript errors manually (use `!` or `as` when appropriate)
+- **Code Formatting**: Use `go fmt` or `make check-style` (do NOT use `goimports`)
 
-### 7.2 Error Types and Responses
+### Commit Messages
 
-| Error Type | HTTP Code | Action | Wait Time | Notes |
-|------------|-----------|--------|-----------|-------|
-| Authentication Failed | 401 | Force re-authentication | Next poll cycle | Token expired |
-| Rate Limit | 429 | Log and continue | Next poll cycle | Resume at next interval |
-| Network Error | - | Log and retry | Next poll cycle | Transient network issues |
-| Timeout | - | Log and retry | Next poll cycle | May indicate API issues |
-| Bad Request | 400 | Log and skip | Next poll cycle | Configuration issue |
-| Server Error | 500 | Log and retry | Next poll cycle | Backend API issue |
+- **Do NOT use conventional commit prefixes** (no `feat:`, `chore:`, `fix:`, etc.)
+- Write clear, concise messages focusing on "why" rather than "what"
+- All commits include attribution footer:
+  ```
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
-**Note:** No exponential backoff is implemented. Backends will simply retry at their configured poll interval. After `MaxConsecutiveFailures` (5) consecutive failures, the backend is automatically disabled.
+  Co-Authored-By: Claude <noreply@anthropic.com>
+  ```
 
-### 7.3 Error Logging
+### Webapp Implementation Notes
 
-When a backend experiences errors:
-- Log each error with details (backend ID, backend name, error type, error message)
-- Track consecutive failure count
-- When a backend is disabled due to `MaxConsecutiveFailures`:
-  - Log critical error with backend details and last error message
-  - Update backend status in KV store to reflect disabled state
-  - Backend will not resume until admin re-enables it via configuration
-- Administrators should monitor server logs for backend health
-
-### 7.4 Duplicate Alert Scenarios
-
-The plugin uses cursor-based pagination and a **plugin-level shared deduplicator** (24-hour TTL) to prevent duplicate alerts across all backends.
-
-**When Duplicates MAY Occur:**
-1. **Backend disable/enable after >24 hours**: If a backend is disabled for more than 24 hours, deduplication cache entries expire. When re-enabled with a cleared cursor, the API returns old alerts that are no longer in the cache.
-2. **Plugin deactivation/activation or server reboot**: Dedup cache is cleared (in-memory only). However, cursor is preserved in KV store, so duplicates should be rare unless the API returns overlapping results.
-
-**When Duplicates SHOULD NOT Occur:**
-1. **Normal polling**: Cursor-based pagination prevents re-fetching old alerts
-2. **Authentication refresh**: Cursor and dedup cache remain intact
-3. **Transient errors**: Cursor is only updated after successful processing
-4. **Backend disable/enable within 24 hours**: Deduplicator retains alert IDs, preventing duplicates even when cursor is cleared
-5. **Backend configuration changes**: Deduplicator is shared across all backend instances
-6. **Multiple backends with same alert**: Namespaced alert IDs prevent cross-backend collisions
-
-**Key Improvement:**
-The plugin-level deduplicator significantly reduces duplicate scenarios compared to per-backend deduplication. Duplicates are now limited to cases where the deduplication cache has been cleared (server restart) or expired (24-hour TTL).
+- **Validation**: Runs on mount and blur, tracks user changes with `useRef` to avoid re-validation during edits
+- **Status Pills**: Use `var(..., fallback)` with explicit hex fallbacks for theme reliability
+- **Channel Selector**: Uses Mattermost Client4 API, searches all channels (public/private) across teams
+- **Status Polling**: Fetches `/api/v1/backends/status` every 30 seconds, merges with config data by backend ID
 
 ---
 
-## Appendix A: Configuration Examples
-
-### A.1 Single Backend Configuration
+## Example Configuration
 
 ```json
 [
@@ -574,113 +161,5 @@ The plugin-level deduplicator significantly reduces duplicate scenarios compared
   }
 ]
 ```
-
-### A.2 Multiple Backend Configuration
-
-```json
-[
-  {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "name": "Dataminr Production",
-    "type": "dataminr",
-    "enabled": true,
-    "url": "https://firstalert-api.dataminr.com",
-    "apiId": "prod_user",
-    "apiKey": "prod_key",
-    "channelId": "prod_channel_id",
-    "pollIntervalSeconds": 30
-  },
-  {
-    "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-    "name": "Dataminr Staging",
-    "type": "dataminr",
-    "enabled": true,
-    "url": "https://staging-api.dataminr.com",
-    "apiId": "staging_user",
-    "apiKey": "staging_key",
-    "channelId": "staging_channel_id",
-    "pollIntervalSeconds": 60
-  }
-]
-```
-
----
-
-## Appendix B: Dataminr API Quick Reference
-
-**Authentication:**
-```
-POST /auth/1/userAuthorization
-Content-Type: application/x-www-form-urlencoded
-
-grant_type=api_key&scope=first_alert_api&api_user_id=X&api_password=Y
-
-Response: {"authorizationToken": "...", "expirationTime": 123...}
-```
-
-**Polling:**
-```
-GET /alerts/1/alerts?alertversion=19&from={cursor}
-Authorization: Dmauth {token}
-
-Response: {"alerts": [...], "to": "cursor"}
-```
-
-**Key Details:**
-- Token lifetime: 1 hour
-- Authorization header: `Dmauth {token}` (NOT Bearer)
-- Poll interval: 30 seconds recommended
-- Rate limit: 180 requests / 10 minutes
-- Cursor-based pagination required
-
-**Alert Types:**
-- **Flash** - Red (#D24B4E) - Breaking news
-- **Urgent** - Orange (#EC8832) - High priority
-- **Alert** - Yellow (#FFBC1F) - Normal
-
----
-
-## 8. Implementation Notes
-
-### 8.1 Critical Implementation Details
-
-**Locking and Configuration:**
-- **CRITICAL**: Never hold `configurationLock` while calling `SavePluginConfig()` - this triggers `OnConfigurationChange()` which tries to acquire the same lock, causing deadlock
-- Use `getConfiguration()` to safely clone config, modify the clone, then call `SavePluginConfig()` without holding locks
-- When re-enabling a backend, failure state is reset (error count and message cleared) to ensure fresh start
-
-**Backend Auto-Disable Callback:**
-- **CRITICAL**: The `disableCallback` in poller.go must be invoked in a goroutine to prevent deadlock
-- Without the goroutine wrapper, when a backend reaches max failures, the poller thread calls `disableCallback()` → triggers `OnConfigurationChange()` → tries to call `backend.Stop()` → waits for the poller to stop → but the poller is waiting for the callback to return = deadlock
-- Wrapping in goroutine allows the poll cycle to complete, then `OnConfigurationChange()` cleanly unregisters, stops, and re-registers the backend as disabled
-- This ensures disabled backends remain in the registry and appear in the status API response
-
-**Polling Wait Interval:**
-- **CRITICAL**: The cluster job scheduler's `nextWaitInterval()` must calculate elapsed time since last execution
-- Returning a fixed interval regardless of elapsed time will cause the job to never execute
-- Pattern: Calculate elapsed time, return remaining wait if interval hasn't passed, return 0 if ready to execute
-- This bug prevented all polling in initial implementation (commit eb2928d)
-
-**Webapp Validation:**
-- Validation runs on component mount and on blur for real-time feedback
-- Track user changes with `useRef` to avoid re-validating during active edits
-- Clear validation errors when user makes changes for better UX
-- Two-layer validation: field-level (blur) + save-level (banner with all errors)
-
-**Status Pill Colors:**
-- Use `var(..., fallback)` syntax with explicit hex fallbacks for reliability across themes
-- Original `rgb(var(...))` syntax failed in some Mattermost themes
-- Status indicators differentiate Error (auto-disabled after failures) vs Disabled (manually disabled)
-
-### 8.2 Testing Guidelines
-
-- **Unit Tests**: Use `testify` for assertions, `plugintest` for mocking Mattermost Plugin API
-- **HTTP Mocking**: Use `httptest` for mocking external API calls (Dataminr)
-- **Integration Tests**: Tests exercising multiple components together, still using mocks, in `*_integration_test.go` files
-- **UUID Generation**: Use Go's built-in `crypto/rand` with standard UUID v4 format
-- **Linting**: **CRITICAL** - Always run `make check-style` before committing to catch TypeScript and Go linting errors
-  - Use `npm run fix` in webapp directory to automatically fix ESLint issues
-  - TypeScript errors must be fixed manually (use non-null assertions `!` or type assertions `as` when appropriate)
-- **Code Formatting**: Use standard `go fmt` or rely on `make check-style` (do NOT use `goimports`)
 
 ---

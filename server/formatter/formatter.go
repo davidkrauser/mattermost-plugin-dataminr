@@ -26,6 +26,11 @@ const (
 	EmojiUnknown = "⚪"
 )
 
+// GetAlertTypeText returns the formatted alert type text with emoji
+func GetAlertTypeText(alertType string) string {
+	return fmt.Sprintf("%s **%s**", getAlertEmoji(alertType), strings.ToUpper(alertType))
+}
+
 // FormatAlert creates a single alert post attachment with all alert information.
 func FormatAlert(alert backend.Alert) *model.SlackAttachment {
 	attachment := &model.SlackAttachment{}
@@ -39,20 +44,19 @@ func FormatAlert(alert backend.Alert) *model.SlackAttachment {
 	// Build all fields
 	var fields []*model.SlackAttachmentField
 
-	// Alert Type and Alert Link (side by side at top)
-	alertTypeValue := fmt.Sprintf("%s %s", getAlertEmoji(alert.AlertType), strings.ToUpper(alert.AlertType))
-	fields = append(fields,
-		&model.SlackAttachmentField{
-			Title: "Alert Type",
-			Value: alertTypeValue,
-			Short: true,
-		},
-	)
-
+	// Alert Link and Public Source (side by side at top)
 	if alert.AlertURL != "" {
 		fields = append(fields, &model.SlackAttachmentField{
 			Title: "Alert Link",
-			Value: fmt.Sprintf("[View Alert](%s)", alert.AlertURL),
+			Value: fmt.Sprintf("**[Open in Dataminr](%s)**", alert.AlertURL),
+			Short: true,
+		})
+	}
+
+	if alert.PublicSourceURL != "" {
+		fields = append(fields, &model.SlackAttachmentField{
+			Title: "Public Source",
+			Value: fmt.Sprintf("**[Open Public Link](%s)**", alert.PublicSourceURL),
 			Short: true,
 		})
 	}
@@ -128,15 +132,6 @@ func FormatAlert(alert backend.Alert) *model.SlackAttachment {
 		fields = append(fields, &model.SlackAttachmentField{
 			Title: "Additional Media",
 			Value: formatMediaLinks(additionalMedia),
-			Short: false,
-		})
-	}
-
-	// Public Source link (last field)
-	if alert.PublicSourceURL != "" {
-		fields = append(fields, &model.SlackAttachmentField{
-			Title: "Public Source",
-			Value: fmt.Sprintf("[Link](%s)", alert.PublicSourceURL),
 			Short: false,
 		})
 	}

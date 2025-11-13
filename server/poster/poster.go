@@ -35,15 +35,21 @@ func (p *Poster) PostAlert(alert backend.Alert, channelID string) error {
 	// Format alert attachment with all fields
 	attachment := formatter.FormatAlert(alert)
 
-	// Generate hashtags for searchability
+	// Generate alert type text and hashtags for searchability
+	alertTypeText := formatter.GetAlertTypeText(alert.AlertType)
 	hashtagText := hashtag.Generate(alert)
 
-	// Create post with attachment
+	// Create post with alert type and hashtags in message
+	message := alertTypeText
+	if hashtagText != "" {
+		message += " " + hashtagText
+	}
+
 	post := &model.Post{
 		UserId:    p.botID,
 		ChannelId: channelID,
 		Type:      model.PostTypeSlackAttachment,
-		Message:   hashtagText, // Add hashtags as the main message text
+		Message:   message, // Alert type + hashtags
 		Props:     model.StringInterface{},
 	}
 

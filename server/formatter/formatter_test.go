@@ -49,16 +49,16 @@ func TestFormatAlert_FullAlert(t *testing.T) {
 	assert.Equal(t, "Test Backend", attachment.Footer)
 
 	// Verify all fields exist in correct order
-	require.Len(t, attachment.Fields, 11)
+	require.Len(t, attachment.Fields, 10)
 
-	// Field 0: Alert Type
-	assert.Equal(t, "Alert Type", attachment.Fields[0].Title)
-	assert.Equal(t, "🔴 FLASH", attachment.Fields[0].Value)
+	// Field 0: Alert Link
+	assert.Equal(t, "Alert Link", attachment.Fields[0].Title)
+	assert.Equal(t, "**[Open in Dataminr](https://example.com/alert/123)**", attachment.Fields[0].Value)
 	assert.Equal(t, model.SlackCompatibleBool(true), attachment.Fields[0].Short)
 
-	// Field 1: Alert Link
-	assert.Equal(t, "Alert Link", attachment.Fields[1].Title)
-	assert.Equal(t, "[View Alert](https://example.com/alert/123)", attachment.Fields[1].Value)
+	// Field 1: Public Source
+	assert.Equal(t, "Public Source", attachment.Fields[1].Title)
+	assert.Equal(t, "**[Open Public Link](https://example.com/source)**", attachment.Fields[1].Value)
 	assert.Equal(t, model.SlackCompatibleBool(true), attachment.Fields[1].Short)
 
 	// Field 2: Event Time
@@ -104,11 +104,6 @@ func TestFormatAlert_FullAlert(t *testing.T) {
 	assert.Equal(t, "Additional Media", attachment.Fields[9].Title)
 	assert.Equal(t, "[Media 2](https://example.com/image2.jpg)", attachment.Fields[9].Value)
 	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[9].Short)
-
-	// Field 10: Public Source (last field)
-	assert.Equal(t, "Public Source", attachment.Fields[10].Title)
-	assert.Equal(t, "[Link](https://example.com/source)", attachment.Fields[10].Value)
-	assert.Equal(t, model.SlackCompatibleBool(false), attachment.Fields[10].Short)
 }
 
 func TestFormatAlert_MinimalAlert(t *testing.T) {
@@ -131,18 +126,13 @@ func TestFormatAlert_MinimalAlert(t *testing.T) {
 	assert.Empty(t, attachment.ImageURL)
 	assert.Equal(t, "Test Backend", attachment.Footer)
 
-	// Verify Alert Type and Event Time fields (no Alert Link since no AlertURL)
-	require.Len(t, attachment.Fields, 2)
+	// Verify only Event Time field (no Alert Link since no AlertURL, no Alert Type field)
+	require.Len(t, attachment.Fields, 1)
 
-	// Field 0: Alert Type
-	assert.Equal(t, "Alert Type", attachment.Fields[0].Title)
-	assert.Equal(t, "🟡 ALERT", attachment.Fields[0].Value)
+	// Field 0: Event Time
+	assert.Equal(t, "Event Time", attachment.Fields[0].Title)
+	assert.Equal(t, "2025-10-30 14:30:00 UTC", attachment.Fields[0].Value)
 	assert.Equal(t, model.SlackCompatibleBool(true), attachment.Fields[0].Short)
-
-	// Field 1: Event Time
-	assert.Equal(t, "Event Time", attachment.Fields[1].Title)
-	assert.Equal(t, "2025-10-30 14:30:00 UTC", attachment.Fields[1].Value)
-	assert.Equal(t, model.SlackCompatibleBool(true), attachment.Fields[1].Short)
 }
 
 func TestGetAlertColor(t *testing.T) {

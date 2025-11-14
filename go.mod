@@ -3,6 +3,7 @@ module github.com/mattermost/mattermost-plugin-dataminr
 go 1.24.3
 
 require (
+	github.com/biter777/countries v1.7.5
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/mattermost/mattermost/server/public v0.1.10
@@ -12,7 +13,6 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/biter777/countries v1.7.5 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dyatlov/go-opengraph/opengraph v0.0.0-20220524092352-606d7b1e5f8a // indirect
